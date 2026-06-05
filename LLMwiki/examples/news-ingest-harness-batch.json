@@ -1,0 +1,41 @@
+{
+  "items": [
+    {
+      "external_id": "harness-exec-20260508-001",
+      "headline": "某上市公司董事增持公司股份",
+      "description": "高管增持相关新闻摘要。",
+      "body": "这里是批量上传中的第一条新闻正文。",
+      "topic": "executive",
+      "executive_name": "张三",
+      "stock_code": "600519",
+      "source_url": "https://example.com/harness/news/600519-1",
+      "metadata": {
+        "crawler": "harness",
+        "job": "exec-news-batch"
+      },
+      "publish_date": "2026-05-08T03:10:00Z",
+      "labels": [
+        "高管",
+        "增持"
+      ]
+    },
+    {
+      "external_id": "harness-general-20260508-002",
+      "headline": "行业景气度持续回升",
+      "description": "综合新闻可不绑定牛散或高管。",
+      "body": "这里是批量上传中的第二条新闻正文。",
+      "topic": "general",
+      "stock_code": "300750",
+      "url": "https://example.com/harness/news/general-2",
+      "meta": {
+        "crawler": "harness",
+        "job": "general-news-batch"
+      },
+      "publish_date": "2026-05-08T03:20:00Z",
+      "labels": [
+        "行业",
+        "景气度"
+      ]
+    }
+  ]
+}

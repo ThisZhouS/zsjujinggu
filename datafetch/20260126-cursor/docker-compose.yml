@@ -1,0 +1,90 @@
+# =================================================================
+# Financial Data Platform - Docker Compose
+# 用法:
+#   全量初始化: bash scripts/init_full_sync.sh
+#   增量同步:   bash scripts/run_incremental.sh
+#   单次执行:   docker compose run --rm app python example/<script>.py
+# =================================================================
+
+services:
+
+  # ---------------------------------------------------------------
+  # PostgreSQL 数据库
+  # 外部工具（Navicat / DBeaver 等）连接参数:
+  #   Host: 服务器IP（本地用 127.0.0.1）
+  #   Port: 5433（宿主机侧，避免与本机 PG 冲突）
+  #   DB  : financial_data
+  #   User: postgres
+  #   Pass: 见 .env 中 DB_PASSWORD
+  # ---------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: financial_data_platform_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-financial_data}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      # 宿主机 5433 -> 容器 5432，防止与宿主机本地 PG 冲突
+      # 若宿主机无本地 PG，可改为 "${DB_PORT:-5432}:5432"
+      - "${DB_EXTERNAL_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # ---------------------------------------------------------------
+  # 应用层（脚本型，按需启动，执行完即退出）
+  # 不要用 docker compose up app，而是用:
+  #   docker compose run --rm app python example/<script>.py
+  # ---------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    image: financial_data_platform_app:latest
+    container_name: financial_data_platform_app
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # 容器内数据库地址覆盖为 service name（容器间通信走内部 5432）
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-financial_data}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      API_LICENSE: ${API_LICENSE:-}
+      API_REQUEST_RATE_LIMIT: ${API_REQUEST_RATE_LIMIT:-60}
+      RETRY_COUNT: ${RETRY_COUNT:-3}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_DIR: ${LOG_DIR:-log}
+    volumes:
+      - ./log:/app/log
+    working_dir: /app
+    command:
+      - "python"
+      - "-c"
+      - "print('Ready. Run: docker compose run --rm app python example/<script>.py')"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  postgres_data:
+    driver: local

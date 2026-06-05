@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+.next/
+.next-dev/
+out/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Testing
+coverage/
+.nyc_output/
+
+# Prisma migrations are source-controlled deployment artifacts.
+!packages/prisma/prisma/migrations/
+!packages/prisma/prisma/migrations/**/*
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Misc
+.cloude/
+.turbo/

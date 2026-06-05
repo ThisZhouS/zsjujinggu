@@ -1,0 +1,21 @@
+{
+  "external_id": "openclaw-investor-20260508-001",
+  "headline": "某牛散加仓后继续重仓宁德时代",
+  "description": "自动抓取到的牛散持仓跟踪摘要。",
+  "body": "这里放自动抓取后的正文内容，支持直接写入 Markdown 或纯文本。",
+  "topic_type": "investor",
+  "investor_id": 24747,
+  "stock_code": "300750",
+  "source_url": "https://example.com/openclaw/news/24747",
+  "source_metadata": {
+    "crawler": "openclaw",
+    "channel": "investor-news",
+    "task_id": "task-openclaw-001"
+  },
+  "publish_date": "2026-05-08T03:00:00Z",
+  "tags": [
+    "牛散",
+    "加仓",
+    "宁德时代"
+  ]
+}

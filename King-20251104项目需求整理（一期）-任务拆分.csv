@@ -1,0 +1,70 @@
+原始序号,模块,子任务ID,具体任务,当前状态,完成标注,对应页面/接口,备注
+1,首页,1.1,首页呈现各总需求模块入口,已实现,已完成,/；/investors；/same-surname-investors；/top-gainers；/investor-increase；/investor-decrease；/common-holdings；/articles,首页功能模块卡片已存在
+1,首页,1.2,首页牛散姓名按市值排序展示,已实现,已完成,/；GET /api/v1/investors,首页牛散市值排行榜已按 totalMarketValue 取前 10
+1,首页,1.3,首页提供搜索输入框,已实现,已完成,/；apps/web/src/components/search/GlobalSearch.tsx,首页已接入全局搜索框
+1,首页,1.4,搜索支持股东姓名与股票代码检索,已实现,已完成,GET /api/v1/search；apps/web/src/components/search/GlobalSearch.tsx,支持股东姓名/股票代码/股票名称检索
+1,首页,1.5,搜索结果点击后以弹窗或新窗口打开,已实现,已完成,/；/stocks/[code]；/investors/[id],回车或选择结果后新窗口打开目标页
+1,首页,1.6,搜索结果展示股票股东信息,已实现,已完成,/stocks/[code]；GET /api/v1/stocks/:code/holders,个股页已展示关联牛散持仓
+1,首页,1.7,搜索结果展示K线,已实现,已完成,/stocks/[code]；GET /api/v1/stocks/:code/kline,个股页已展示日线 K 线
+1,首页,1.8,首页右侧展示10-20篇文章并可进入更多,已实现,已完成,/；/articles,首页右侧最新文章区已存在
+2,牛散,2.1,展示全部牛散姓名,已实现,已完成,/investors；GET /api/v1/investors,牛散列表页已存在
+2,牛散,2.2,按资产排序,已实现,已完成,/investors；GET /api/v1/investors,列表支持按 totalMarketValue 排序
+2,牛散,2.3,按姓氏排序或同姓聚合,已实现,已完成,/same-surname-investors；GET /api/v1/investors/same-surname-groups,同姓分组页已支持按姓氏/人数/市值排序，默认按姓氏升序
+2,牛散,2.4,点击姓名进入牛散详情页,已实现,已完成,/investors/[id],列表已可跳转详情
+2,牛散,2.5,详情展示股票名称/持股数量/持股比例/持股变动/总市值,已实现,已完成,/investors/[id],持仓表已有对应字段
+2,牛散,2.6,详情展示至今涨幅或收益率,已实现,已完成,/investors/[id],持仓表已展示收益率
+2,牛散,2.7,详情展示真实报告期,已实现,已完成,/investors/[id],最新持仓表已展示真实报告期
+2,牛散,2.8,详情页股票可点击进入个股界面,已实现,已完成,/investors/[id]；/stocks/[code],前后端个股页已接通
+2,牛散,2.9,详情展示牛散个人信息介绍,已实现,已完成,/investors/[id],bio 已展示
+2,牛散,2.10,详情展示牛散相关新闻,已实现,已完成,/investors/[id]；GET /api/v1/articles/investor/:investorId/news,详情页已新增相关新闻板块并预留 OpenClaw/Harness 自动化接入接口
+2,牛散,2.11,管理员增删牛散并自动生成入口,已实现,已完成,/admin/investors；POST/PUT/DELETE /api/v1/investors,管理侧页面与接口已存在
+3,文章,3.1,前台展示全部财经金融文章,已实现,已完成,/articles；GET /api/v1/articles,文章中心已接入
+3,文章,3.2,文章按日期排列,已实现,已完成,/articles；GET /api/v1/articles,按 publishDate 倒序
+3,文章,3.3,首页文章区与文章中心联动,已实现,已完成,/；/articles,首页文章区已从文章接口取数
+3,文章,3.4,管理员可编辑文章页,已实现,已完成,/admin/articles；POST/PUT/DELETE /api/v1/articles,后台文章管理已接入
+4,共同持仓,4.1,支持1+N牛散共同持仓查询,已实现,已完成,/common-holdings；GET /api/v1/holdings/common,支持多选牛散查询
+4,共同持仓,4.2,展示股票名称/代码/持仓牛散数量/牛散名称/总市值,已实现,已完成,/common-holdings,核心字段已展示
+4,共同持仓,4.3,展示主营收入,已实现,已完成,/common-holdings；GET /api/v1/holdings/common,已接入最新营业总收入字段
+4,共同持仓,4.4,展示持有该股的牛散姓名,已实现,已完成,/common-holdings,investorNames 已展示
+4,共同持仓,4.5,牛散姓名可点击跳转详情,已实现,已完成,/common-holdings,牛散姓名已支持跳转详情
+5,牛散增持,5.1,按相邻季度或报告期对比识别增持,已验证,已完成,/investor-increase；GET /api/v1/holdings/increase,已做接口与页面验证
+5,牛散增持,5.2,展示个人股东当前持股数,已验证,已完成,/investor-increase,currentShares 已验证
+5,牛散增持,5.3,展示增持仓位百分比,已验证,已完成,/investor-increase,changePercent 已验证
+5,牛散增持,5.4,展示公司总市值,已验证,已完成,/investor-increase,totalMarketValue 已验证
+5,牛散增持,5.5,展示平均增持均价,已实现,已完成,/investor-increase；GET /api/v1/holdings/increase,已按报告期附近最近交易日价格补齐估算均价字段
+5,牛散增持,5.6,展示收入构成或主营收入,已实现,已完成,/investor-increase,已展示最新营业总收入字段
+6,牛散减持,6.1,按相邻季度或报告期对比识别减持,已验证,已完成,/investor-decrease；GET /api/v1/holdings/decrease,已做接口与页面验证
+6,牛散减持,6.2,进入某只股票十大流通股东后持续追踪每期记录,已实现,已完成,/investors/[id]；GET /api/v1/investors/:id/top-flow-tracking,已改为牛散详情页“十大流通股东追踪”板块并按代表性报告期连续输出
+6,牛散减持,6.3,展示个人股东当前持股数,已验证,已完成,/investor-decrease,currentShares 已验证
+6,牛散减持,6.4,展示减持比例,已验证,已完成,/investor-decrease,changePercent 已验证
+6,牛散减持,6.5,展示公司总市值,已验证,已完成,/investor-decrease,totalMarketValue 已验证
+6,牛散减持,6.6,展示平均减持均价,已实现,已完成,/investor-decrease；GET /api/v1/holdings/decrease,已按报告期附近最近交易日价格补齐估算均价字段
+6,牛散减持,6.7,展示收入构成或主营收入,已实现,已完成,/investor-decrease,已展示最新营业总收入字段
+7,牛散新进,7.1,按相邻季度或报告期识别新增持仓,已验证,已完成,/investor-new；GET /api/v1/holdings/new,已做接口与页面验证
+7,牛散新进,7.2,展示牛散新进明细榜单,已验证,已完成,/investor-new,当前为牛散-股票明细
+7,牛散新进,7.3,按股票聚合展示牛散新进数量,已验证,已完成,/investor-new；GET /api/v1/holdings/new?mode=stock,已支持新进明细/按股票聚合双视图
+7,牛散新进,7.4,展示主营收入,已实现,已完成,/investor-new,已展示最新营业总收入字段
+8,高管增持,8.1,提供最近1-12月高管增持数据榜,已验证,已完成,/executive-increase；GET /api/v1/executives/increase?months=1..12,已切到最近 1-12 月滚动区间并按 executive_trades 聚合
+8,高管增持,8.2,展示股票名称/代码/增持金额/交易次数/总市值,已验证,已完成,/executive-increase,核心字段已验证
+8,高管增持,8.3,展示主营收入,已验证,已完成,/executive-increase,已补齐最新营业总收入字段与报告期
+8,高管增持,8.4,展示高管相关新闻板块并预留后续接入接口,已实现,已完成,/executive-increase；GET /api/v1/articles/executive/news；POST /api/v1/articles/automation/:provider/news；POST /api/v1/articles/automation/openclaw/news；POST /api/v1/articles/automation/harness/news,页面板块、统一自动上传接口、旧路由兼容与后台/投稿编辑链路已接入；实际环境仍需配置 NEWS_AUTOMATION_KEY
+9,十大增持,9.1,最近一个季度自然人股东增持排行,已验证,已完成,/top-increase；GET /api/v1/stocks/top-increase,当前基于最近有效报告期
+9,十大增持,9.2,固定输出前100排名,已验证,已完成,/top-increase；GET /api/v1/stocks/top-increase,后端已固化前 100 口径并分页展示
+9,十大增持,9.3,按增持市值排序,已验证,已完成,/top-increase,increaseMarketValue 已验证
+10,个人股东,10.1,单支持股双榜页面与接口,已验证,已完成,/individual-shareholders；GET /api/v1/individual-shareholders,页面与接口已切到单支持股双榜口径
+10,个人股东,10.2,牛散且单支持股数据筛选,已验证,已完成,/individual-shareholders,已按 investors.category=personal 且 stockCount=1 筛选
+10,个人股东,10.3,牛散且单支持股按持仓市值从高到低排序,已验证,已完成,/individual-shareholders,后端按 totalMarketValue 倒序输出
+10,个人股东,10.4,机构且单支持股数据筛选,已验证,已完成,/individual-shareholders,已按 investors.category=institution 且 stockCount=1 筛选
+10,个人股东,10.5,机构且单支持股按持仓市值从高到低排序,已验证,已完成,/individual-shareholders,后端按 totalMarketValue 倒序输出
+10,个人股东,10.6,支持牛散榜与机构榜切换展示,已验证,已完成,/individual-shareholders,前端已支持牛散单支持股/机构单支持股 Tabs 切换
+11,巴菲特持仓,11.1,巴菲特持仓专题页,已实现,已完成,/buffett-holdings,专题页已存在
+11,巴菲特持仓,11.2,后台维护巴菲特专题内容,已实现,已完成,/admin/articles；文章 category=buffett,通过文章分类维护
+11,巴菲特持仓,11.3,展示巴菲特相关新闻,已实现,已完成,/buffett-holdings,专题文章即相关新闻内容
+12,木头姐持仓,12.1,木头姐或ARKK专题页,已实现,已完成,/arkk-holdings,专题页已存在
+12,木头姐持仓,12.2,后台维护木头姐专题内容,已实现,已完成,/admin/articles；文章 category=arkk,通过文章分类维护
+12,木头姐持仓,12.3,展示木头姐相关新闻,已实现,已完成,/arkk-holdings,专题文章即相关新闻内容
+13,分红股息率最高,13.1,过去1年股息率排行,已实现,已完成,/dividend-yield；GET /api/v1/dividends/yield-ranking?mode=rolling1y,已改为真实滚动近 1 年排行，并保留按年度与近 3 年平均模式
+13,分红股息率最高,13.2,过去3年平均股息率排行,已验证,已完成,/dividend-yield；GET /api/v1/dividends/yield-ranking?mode=avg3y,已支持 3 年平均股息率排行
+13,分红股息率最高,13.3,按分红金额除以分红日股价计算股息率,已实现,已完成,业务数据同步；GET /api/v1/dividends/yield-ranking,dividendYield 已物化
+13,分红股息率最高,13.4,按股息率排序,已实现,已完成,/dividend-yield,页面按 dividendYield 展示排序
+13,分红股息率最高,13.5,展示股票代码/名称/股息率/分红金额,已验证,已完成,/dividend-yield,已改为展示 totalDividend 总分红金额

@@ -1,0 +1,232 @@
+---
+alwaysApply: true
+---
+### 一、 核心开发原则
+
+1.  **需求边界明确**：严格实现用户指定的功能需求，禁止未经确认的功能扩展或变更。
+2.  **代码质量第一**：交付的所有代码必须可正确运行，无语法错误、运行时错误及逻辑缺陷。
+3.  **代码规范统一**：
+    - **风格**：严格遵循 PEP 8 规范。
+    - **命名**：采用语义清晰、一致的命名方式。
+    - **类型**：为所有函数/方法的参数和返回值提供明确的类型注解。
+4.  **模块化设计**：
+    - 单个函数代码行数 ≤ 50 行（不含注释、空行、导入）。
+    - 单个模块代码行数 ≤ 500 行（同上）。
+5.  **架构设计目标**：代码应具备**易读性、易修改性、易扩展性**。
+6.  **沟通确认机制**：对需求、设计方案存在任何不确定时，必须与用户确认后再实施。
+
+### 二、 代码编写规范
+
+#### 1. 函数定义模板
+所有函数必须遵循以下格式：
+```python
+def function_name(param1: type, param2: type) -> return_type:
+    """
+    清晰描述函数的核心功能。
+
+    Args:
+        param1 (type): 参数1的详细描述。
+        param2 (type): 参数2的详细描述。
+
+    Returns:
+        return_type: 返回值的详细描述。
+
+    API接口: [此函数所关联的 API 接口名称，若无则写“无”]
+    """
+    # 函数主体
+    return result
+```
+
+#### 2. API 接口开发规范
+- **编程范式**：采用面向对象编程，合理运用继承、多态与方法重写。
+- **功能要求**：每个 API 类必须实现完整的数据访问与存储逻辑。
+- **调用方式**：每个API接口均包含”fetch_接口名“，“save_接口名”，”fetch_and_save_接口名“三个方法，分别用于获取数据和存储数据，以及同时获取并存储数据。
+- **参数管理**：API 的运行时参数应来源于外部输入（如配置、请求参数），而非硬编码。
+- **数据存储**：
+  - 每个 API 接口应对应一个独立的数据库表。
+  - 表结构以 `Python` 数据模型文件进行定义和存储。
+- **配置管理**：
+  - 许可证（License）等敏感信息统一存储在 `.env` 文件中。
+  - 请求频率限制等配置项在 `.env` 文件中定义。
+
+### 三、 数据库规范
+
+- **数据库系统**：PostgreSQL。
+- **连接配置**：数据库连接地址、用户名、密码、数据库名等参数均在 `.env` 文件中定义。
+- **表结构文档**：在项目规划（Plan）阶段，需明确每个 API 接口对应的表结构，包括字段名、数据类型、约束、注释等详细信息。
+
+### 四、 控制程序与集成规范
+
+- **可定制性**：支持用户基于提供的函数和 API 构建个性化的控制流程或应用程序。
+- **集成方式**：通过直接调用函数来访问 API 接口并触发数据存储。
+- **交付文档**：每个模块需提供配套的说明文档（DOCX 格式），文档存放于与代码文件同级的 `docs/` 目录下。文档需包含：
+  - 功能概述及对应的 API 接口清单。
+  - 相关的数据库表名及详细结构。
+  - 函数/接口的调用参数说明。
+  - 模块的导入与使用示例。
+### 开发环境
+- **Python 版本**：3.11.5
+- **数据库系统**：PostgreSQL
+- **依赖管理**：使用 `requirements.txt` 文件管理项目依赖。
+### 项目关键特性
+
+1.  **清晰的分层架构**：采用六层架构设计，确保职责分离，依赖清晰。
+2.  **市场数据隔离**：不同市场的数据 API 独立部署与管理，保证数据边界与安全。
+3.  **跨模块统一标准**：所有模块遵循相同的开发、设计与命名规范。
+4.  **灵活的扩展能力**：架构设计支持便捷地新增市场模块或数据类别。
+5.  **完整的说明文档**：为所有接口、参数和使用方式提供详尽的技术文档。
+### 目录结构
+```
+financial_data_platform/
+├── requirements.txt                 # 项目依赖
+├── README.md                        
+├── config/
+│   ├── __init__.py
+│   ├── settings.py                  # 配置文件
+│   └── database.py                  # 数据库配置
+├── core/                            # 核心文件
+│   ├── __init__.py
+│   ├── base_api.py                  # 基础API类
+│   ├── data_manager.py              # 数据管理器
+│   └── exceptions.py                # 自定义异常
+├── models/                          # 数据分析模型
+│   ├── __init__.py
+│   └── base.py                      # 基础模型
+├── api_clients/                     # API接口的实现
+│   ├── __init__.py
+│   ├── base_client.py               # 基础客户端
+│   ├─CompanyBasicInfo/                       
+│   │   ├── CompanyBasicInfo.py
+│   │   └── CompanyBasicInfo_table.py                    
+│   ├─CompanyHistoricalData/
+│   │   ├── CompanyHistoricalData.py
+│   │   └── CompanyHistoricalData_table.py    
+│   ├─FinancialCoreIndicators/
+│   │   ├── FinancialCoreIndicators.py
+│   │   └── FinancialCoreIndicators_table.py    
+│   ├─FinancialQuartersEvents/
+│   │   ├── FinancialQuartersEvents.py
+│   │   └── FinancialQuartersEvents_table.py    
+│   ├─FinancialStatements/
+│   │   ├── FinancialStatements.py
+│   │   └── FinancialStatements_table.py    
+│   ├─IndexTechnicalIndicators/
+│   │  ├── IndexTechnicalIndicators.py
+│   │  └── IndexTechnicalIndicators_table.py    
+│   ├─ShanghaiShenzhenTechnicalIndicators/
+│   │  ├── ShanghaiShenzhenTechnicalIndicators.py
+│   │  └── ShanghaiShenzhenTechnicalIndicators_table.py    
+│   ├─HistoricalTradingData/
+│   │   ├── HistoricalTradingData.py
+│   │   └── HistoricalTradingData_table.py    
+│   ├─IndexRelationshipMapping/
+│   │   ├── IndexRelationshipMapping.py
+│   │   └── IndexRelationshipMapping_table.py    
+│   ├─MajorMarketLists/
+│   │   ├── MajorMarketLists.py
+│   │   └── MajorMarketLists_table.py    
+│   ├─OtherMarketLists/
+│   │   ├── OtherMarketLists.py
+│   │   └── OtherMarketLists_table.py    
+│   ├─MarketDepthData/
+│   │   ├── MarketDepthData.py
+│   │   └── MarketDepthData_table.py    
+│   ├─IndexRealTimeData/
+│   │  ├── IndexRealTimeData.py
+│   │  └── IndexRealTimeData_table.py    
+│   ├─StockRealTimeData/
+│   │  ├── StockRealTimeData.py
+│   │  └── StockRealTimeData_table.py    
+│   ├─RealTimeTradingInterfaces/
+│   │   ├── RealTimeTradingInterfaces.py
+│   │   └── RealTimeTradingInterfaces_table.py    
+│   ├─ShareholderBasicInfo/
+│   │   ├── ShareholderBasicInfo.py
+│   │   └── ShareholderBasicInfo_table.py    
+│   ├─ShareholderDetailedData/
+│   │   ├── ShareholderDetailedData.py
+│   │   └── ShareholderDetailedData_table.py    
+│   ├─StockPoolClassification/
+│   │   ├── StockPoolClassification.py
+│   │   └── StockPoolClassification_table.py    
+│   └─TradingDetailsSpecialData/  
+│   │   ├── TradingDetailsSpecialData.py
+│   │   └── TradingDetailsSpecialData_table.py    
+├── services/
+│   ├── __init__.py
+│   ├── data_service.py              # 数据服务
+│   ├── storage_service.py           # 存储服务
+│   └── analysis_service.py          # 分析服务
+├── log/                            # 日志目录
+│   ├── api_clients/                # API客户端日志
+│   │  ├─CompanyBasicInfo/
+│   │  ├─CompanyHistoricalData/
+│   │  ├─FinancialCoreIndicators/
+│   │  ├─FinancialQuartersEvents/
+│   │  ├─FinancialStatements/
+│   │  ├─IndexTechnicalIndicators/
+│   │  ├─ShanghaiShenzhenTechnicalIndicators/
+│   │  ├─HistoricalTradingData/
+│   │  ├─IndexRelationshipMapping/
+│   │  ├─MajorMarketLists/
+│   │  ├─OtherMarketLists/
+│   │  ├─MarketDepthData/
+│   │  ├─IndexRealTimeData/
+│   │  ├─StockRealTimeData/
+│   │  ├─RealTimeTradingInterfaces/
+│   │  ├─ShareholderBasicInfo/
+│   │  ├─ShareholderDetailedData/
+│   │  ├─StockPoolClassification/
+│   │  └─TradingDetailsSpecialData/
+│   ├── core/                       # 核心模块日志
+│   │   ├── base_api/
+│   │   ├── data_manager/
+│   │   └── exceptions/
+│   ├── services/                   # 服务层日志
+│   │   ├── data_service/
+│   │   ├── storage_service/
+│   │   └── analysis_service/
+│   └── interfaces/                 # 接口层日志
+│       ├── data_api/
+│       ├── analysis_api/
+│       └── visualization_api/
+├── docx/
+│  ├─CompanyBasicInfo.md
+│  ├─CompanyHistoricalData.md
+│  ├─FinancialCoreIndicators.md
+│  ├─FinancialQuartersEvents.md
+│  ├─FinancialStatements.md
+│  ├─HistoricalTechnicalIndicators/
+│  │  ├─IndexTechnicalIndicators.md
+│  │  └─ShanghaiShenzhenTechnicalIndicators.md
+│  ├─HistoricalTradingData.md
+│  ├─IndexRelationshipMapping.md
+│  ├─MarketBasicInfo/
+│  │  ├─MajorMarketLists.md
+│  │  └─OtherMarketLists.md
+│  ├─MarketDepthData/
+│  ├─RealTimeTradingData/
+│  │  ├─IndexRealTimeData.md
+│  │  └─StockRealTimeData.md
+│  ├─RealTimeTradingInterfaces.md
+│  ├─ShareholderBasicInfo.md
+│  ├─ShareholderDetailedData.md
+│  ├─StockPoolClassification.md
+│  └─TradingDetailsSpecialData.md
+├── test/                           # 测试目录
+│   ├── __init__.py
+│   ├── test_api_clients/           # API客户端测试
+│   ├── test_services/              # 服务层测试
+│   └── test_interfaces/            # 接口层测试
+├── utils/
+│   ├── __init__.py
+│   ├── logger.py                    # 日志工具
+│   ├── date_utils.py                # 日期工具
+│   └── data_utils.py                # 数据处理工具
+├── interfaces/
+│   ├── __init__.py
+│   ├── data_api.py                  # 数据查询接口
+│   ├── analysis_api.py              # 分析接口
+│   └── visualization_api.py         # 可视化接口
+└── .env                             # 环境文件
+```

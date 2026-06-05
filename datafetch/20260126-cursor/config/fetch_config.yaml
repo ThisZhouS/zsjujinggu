@@ -1,0 +1,68 @@
+# 全量获取脚本配置文件
+#
+# 该配置文件用于控制 scripts/run_useful_full_fetch.py 的行为
+# 可以通过命令行参数覆盖配置文件中的值
+
+# ========== 执行配置 ==========
+
+# 是否启用断点续跑（默认：false）
+resume: false
+
+# 全量获取起始日期，格式：YYYY-MM-DD（默认：1991-01-01）
+full_start_date: "1991-01-01"
+
+# 全量获取结束日期，格式：YYYY-MM-DD（默认：今天，留空自动使用今天）
+# full_end_date: ""
+
+# ========== 并发和重试配置 ==========
+
+# 异步并发任务数（默认：5）
+# 建议：根据 CPU 核心数和网络带宽调整
+concurrency: 5
+
+# 每个任务失败后的最大重试次数（默认：3）
+retry_times: 3
+
+# 非断网失败时的重试等待秒数（默认：10）
+retry_delay_seconds: 10
+
+# ========== 网络和限流配置 ==========
+
+# 检测到断网后的暂停秒数（默认：30）
+pause_seconds: 30
+
+# 限制总接口请求速率为每秒多少次（默认：5）
+# 注意：实际每分钟请求数 = global_qps * 60
+global_qps: 5
+
+# ========== 脚本选择配置 ==========
+
+# 指定要执行的脚本列表（留空表示执行所有脚本）
+# 示例：
+#   scripts:
+#     - major_market_lists_fetch_and_save_stock_list.py
+#     - financial_core_indicators_fetch_and_save_financial_main_indicators.py
+scripts: []
+
+# ========== 路径配置 ==========
+
+# useful 目录路径（留空使用默认值：PROJECT_ROOT/useful）
+# useful_dir: ""
+
+# 日志目录路径（留空使用默认值：PROJECT_ROOT/log/full_fetch）
+# log_dir: ""
+
+# 状态文件目录路径（留空使用默认值：PROJECT_ROOT/log/full_fetch_state）
+# state_dir: ""
+
+# ========== 高级配置 ==========
+
+# 是否启用详细日志（默认：false）
+verbose: false
+
+# 是否在测试模式下运行（不实际执行，只显示任务列表）
+dry_run: false
+
+# 单日模式：只执行指定日期的任务
+# single_date_mode: false
+# single_date: "2024-01-15"

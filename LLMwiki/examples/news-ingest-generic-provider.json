@@ -1,0 +1,20 @@
+{
+  "article": {
+    "id": "provider-generic-20260508-001",
+    "title": "机构单支持股出现集中关注",
+    "summary": "示例展示通用 :provider 路由和嵌套 article 包装。",
+    "content": "这里是正文内容。",
+    "topicType": "general",
+    "relatedStockCode": "002594",
+    "sourceUrl": "https://example.com/provider/news/generic-001",
+    "sourceMetadata": {
+      "from": "third-party-pipeline",
+      "scene": "generic-route"
+    },
+    "publishDate": "2026-05-08T03:30:00Z",
+    "tags": [
+      "机构",
+      "单支持股"
+    ]
+  }
+}

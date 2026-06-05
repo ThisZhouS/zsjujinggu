@@ -1,0 +1,2236 @@
+// King 财经数据平台 - Prisma Schema
+// 包含 20 个数据模型
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户表
+model User {
+  id            BigInt      @id @default(autoincrement())
+  phone         String      @unique
+  email         String?     @unique
+  emailVerifiedAt DateTime?
+  password      String      @db.VarChar(255)
+  username      String?     @unique
+  nickname      String?
+  role          UserRole    @default(USER)
+  canUploadArticles Boolean @default(false)
+  canAccessVideos  Boolean  @default(false)
+  vipExpiresAt  DateTime?
+  avatar        String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  favorites     UserFavorite[]
+  watchlists    Watchlist[]
+  priceAlerts   PriceAlert[]
+  notifications Notification[]
+  apiKeys       ApiKey[]
+  orders        Order[]
+  memberLogs    MemberLog[]
+  articles      Article[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+// 牛散表
+model Investor {
+  id              BigInt   @id @default(autoincrement())
+  name            String   @unique @db.VarChar(100)
+  avatar          String?
+  bio             String?  @db.Text
+  totalMarketValue Decimal? @db.Decimal(20, 2)
+  stockCount      Int?
+  category        String   @default("personal") @db.VarChar(20)
+  isTracked       Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  holdings        Holding[]
+  favorites       UserFavorite[]
+
+  @@index([category, isTracked], map: "idx_investors_category_tracked")
+  @@map("investors")
+}
+
+// 持仓表
+model Holding {
+  id          BigInt    @id @default(autoincrement())
+  investorId  BigInt
+  stockCode   String    @db.VarChar(10)
+  stockName   String    @db.VarChar(100)
+  holdCount   BigInt
+  holdRatio   Decimal?  @db.Decimal(5, 2)
+  actualCost  Decimal?  @db.Decimal(20, 2)
+  reportDate  DateTime  @db.Date
+  dataSlot    BusinessDataSlot @default(PRIMARY)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  investor    Investor  @relation(fields: [investorId], references: [id], onDelete: Cascade)
+  stock       Stock     @relation(fields: [stockCode], references: [code], onDelete: Cascade)
+
+  @@unique([investorId, stockCode, reportDate, dataSlot])
+  @@index([investorId, dataSlot])
+  @@index([stockCode, dataSlot])
+  @@index([reportDate, dataSlot])
+  @@index([dataSlot, investorId, stockCode, reportDate], map: "idx_holdings_slot_investor_stock_report")
+  @@index([dataSlot, reportDate, investorId, stockCode], map: "idx_holdings_slot_report_investor_stock")
+  @@map("holdings")
+}
+
+// 股票表
+model Stock {
+  id              BigInt        @id @default(autoincrement())
+  code            String        @unique @db.VarChar(10)
+  name            String        @db.VarChar(100)
+  industry        String?       @db.VarChar(50)
+  market          Market        @default(A)
+  listingDate     DateTime?     @db.Date
+  currentPrice    Decimal?      @db.Decimal(10, 2)
+  totalMarketCap  Decimal?      @db.Decimal(20, 2)
+  priceUpdatedAt  DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  holdings        Holding[]
+  watchlists      Watchlist[]
+  dividends       Dividend[]
+  klineDailies    KlineDaily[]
+  executiveTrades ExecutiveTrade[]
+
+  @@index([code])
+  @@index([industry])
+  @@map("stocks")
+}
+
+enum Market {
+  A
+  HK
+  US
+}
+
+enum StarInvestorType {
+  BUFFETT
+  CATHERINE_WOOD
+}
+
+enum StarHoldingChangeType {
+  INCREASE
+  DECREASE
+  KEEP
+  UNKNOWN
+}
+
+// K线日线表
+model KlineDaily {
+  id          BigInt   @id @default(autoincrement())
+  stockCode   String   @db.VarChar(10)
+  tradeDate   DateTime @db.Date
+  open        Decimal  @db.Decimal(10, 2)
+  high        Decimal  @db.Decimal(10, 2)
+  low         Decimal  @db.Decimal(10, 2)
+  close       Decimal  @db.Decimal(10, 2)
+  volume      BigInt
+  amount      Decimal  @db.Decimal(20, 2)
+  changePct   Decimal? @db.Decimal(10, 4)
+  turnover    Decimal? @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+  stock       Stock    @relation(fields: [stockCode], references: [code], onDelete: Cascade)
+
+  @@unique([stockCode, tradeDate])
+  @@index([stockCode])
+  @@index([tradeDate])
+  @@map("kline_daily")
+}
+
+model StarInvestorSnapshot {
+  id                BigInt           @id @default(autoincrement())
+  investorType      StarInvestorType
+  investorName      String           @db.VarChar(100)
+  organizationName  String?          @db.VarChar(200)
+  description       String?          @db.Text
+  logoUrl           String?          @db.VarChar(500)
+  period            String           @db.VarChar(20)
+  reportDate        DateTime?        @db.Date
+  holdingStockCount Int?
+  holdingValue      Decimal?         @db.Decimal(24, 2)
+  tradeProportion   Decimal?         @db.Decimal(14, 8)
+  topTenPercent     Decimal?         @db.Decimal(14, 8)
+  topIncreaseCode   String?          @db.VarChar(30)
+  topIncreaseName   String?          @db.VarChar(100)
+  topDecreaseCode   String?          @db.VarChar(30)
+  topDecreaseName   String?          @db.VarChar(100)
+  sourceUrl         String           @db.VarChar(500)
+  scrapedAt         DateTime         @default(now())
+  rawPayload        String?          @db.Text
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@unique([investorType, period])
+  @@index([investorType, scrapedAt])
+  @@map("star_investor_snapshots")
+}
+
+model StarInvestorHolding {
+  id                      BigInt                @id @default(autoincrement())
+  investorType            StarInvestorType
+  investorName            String                @db.VarChar(100)
+  period                  String                @db.VarChar(20)
+  sourceReportDate        DateTime?             @db.Date
+  stockCode               String                @db.VarChar(30)
+  stockName               String                @db.VarChar(200)
+  instrumentCode          String                @default("") @db.VarChar(50)
+  iconUrl                 String?               @db.VarChar(500)
+  route                   String?               @db.VarChar(200)
+  typeRoute               String?               @db.VarChar(50)
+  industry                String?               @db.VarChar(100)
+  holdingType             StarHoldingChangeType @default(UNKNOWN)
+  tradePrice              Decimal?              @db.Decimal(18, 4)
+  tradeQuantity           BigInt?
+  previousHoldingQuantity BigInt?
+  holdingQuantity         BigInt?
+  reportDate              DateTime?             @db.Date
+  reportMarketValue       Decimal?              @db.Decimal(24, 2)
+  changeRate              Decimal?              @db.Decimal(14, 8)
+  proportion              Decimal?              @db.Decimal(14, 8)
+  latestPrice             Decimal?              @db.Decimal(18, 4)
+  latestMarketValue       Decimal?              @db.Decimal(24, 2)
+  sourceUrl               String                @db.VarChar(500)
+  scrapedAt               DateTime              @default(now())
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+
+  @@unique([investorType, period, stockCode, instrumentCode])
+  @@index([investorType, period])
+  @@index([investorType, holdingType])
+  @@index([stockCode])
+  @@map("star_investor_holdings")
+}
+
+model StarInvestorTrade {
+  id                BigInt                @id @default(autoincrement())
+  investorType      StarInvestorType
+  investorName      String                @db.VarChar(100)
+  period            String                @db.VarChar(20)
+  sourceKey         String                @unique @db.VarChar(191)
+  sourceReportDate  DateTime?             @db.Date
+  stockCode         String                @db.VarChar(30)
+  stockName         String                @db.VarChar(200)
+  instrumentCode    String                @default("") @db.VarChar(50)
+  iconUrl           String?               @db.VarChar(500)
+  route             String?               @db.VarChar(200)
+  typeRoute         String?               @db.VarChar(50)
+  industry          String?               @db.VarChar(100)
+  holdingType       StarHoldingChangeType @default(UNKNOWN)
+  tradePrice        Decimal?              @db.Decimal(18, 4)
+  tradeQuantity     BigInt?
+  holdingQuantity   BigInt?
+  reportDate        DateTime?             @db.Date
+  reportMarketValue Decimal?              @db.Decimal(24, 2)
+  changeRate        Decimal?              @db.Decimal(14, 8)
+  proportion        Decimal?              @db.Decimal(14, 8)
+  latestPrice       Decimal?              @db.Decimal(18, 4)
+  sourceUrl         String                @db.VarChar(500)
+  scrapedAt         DateTime              @default(now())
+  lastSeenAt        DateTime              @default(now())
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@index([investorType, period])
+  @@index([investorType, period, stockCode])
+  @@index([reportDate])
+  @@map("star_investor_trades")
+}
+
+// 文章表
+model Article {
+  id          BigInt        @id @default(autoincrement())
+  title       String        @db.VarChar(200)
+  content     String        @db.Text
+  summary     String?       @db.VarChar(500)
+  coverImage  String?       @db.VarChar(500)
+  author      String?       @db.VarChar(50)
+  createdByUserId BigInt?
+  category    ArticleCategory?
+  topicType   ArticleTopicType @default(GENERAL)
+  relatedInvestorId BigInt?
+  relatedStockCode String?      @db.VarChar(10)
+  relatedExecutiveName String?  @db.VarChar(100)
+  automationProvider AutomationProvider?
+  automationExternalId String?  @db.VarChar(191)
+  sourceUrl   String?           @db.VarChar(500)
+  sourceMetadata String?        @db.Text
+  publishDate DateTime      @default(now())
+  isPinned    Boolean       @default(false)
+  viewCount   Int           @default(0)
+  tags        String[]      @default([])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  createdBy   User?         @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdByUserId])
+  @@index([category])
+  @@index([publishDate])
+  @@index([topicType, relatedInvestorId, publishDate], map: "idx_articles_topic_investor_date")
+  @@index([topicType, relatedStockCode, publishDate], map: "idx_articles_topic_stock_date")
+  @@index([topicType, relatedExecutiveName, publishDate], map: "idx_articles_topic_exec_name_date")
+  @@unique([automationProvider, automationExternalId], map: "uq_articles_automation_provider_external")
+  @@map("articles")
+}
+
+enum ArticleCategory {
+  BUFFETT
+  WOOD
+  GENERAL
+}
+
+enum ArticleTopicType {
+  GENERAL
+  INVESTOR
+  EXECUTIVE
+}
+
+enum AutomationProvider {
+  OPENCLAW
+  HARNESS
+}
+
+// 高管交易表
+model ExecutiveTrade {
+  id              BigInt   @id @default(autoincrement())
+  stockCode       String   @db.VarChar(10)
+  stockName       String   @db.VarChar(100)
+  executiveName   String   @db.VarChar(50)
+  executivePosition String @db.VarChar(50)
+  tradeType       TradeType
+  tradeCount      BigInt
+  tradePrice      Decimal? @db.Decimal(10, 2)
+  tradeAmount     Decimal? @db.Decimal(20, 2)
+  tradeDate       DateTime @db.Date
+  reportDate      DateTime @db.Date
+  dataSlot        BusinessDataSlot @default(PRIMARY)
+  createdAt       DateTime @default(now())
+  stock           Stock    @relation(fields: [stockCode], references: [code], onDelete: Cascade)
+
+  @@index([stockCode, dataSlot])
+  @@index([executiveName, dataSlot])
+  @@index([reportDate, dataSlot])
+  @@map("executive_trades")
+}
+
+enum TradeType {
+  INCREASE
+  DECREASE
+  SAME
+}
+
+// 分红表
+model Dividend {
+  id            BigInt    @id @default(autoincrement())
+  stockCode     String    @db.VarChar(10)
+  stockName     String    @db.VarChar(100)
+  dividendYear  Int
+  dividendDate  DateTime? @db.Date
+  cashDividend  Decimal?  @db.Decimal(10, 4)
+  bonusShare    Decimal?  @db.Decimal(10, 2)
+  transferShare Decimal?  @db.Decimal(10, 2)
+  totalDividend Decimal?  @db.Decimal(20, 2)
+  dividendYield Decimal?  @db.Decimal(10, 4)
+  dataSlot      BusinessDataSlot @default(PRIMARY)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  stock         Stock     @relation(fields: [stockCode], references: [code], onDelete: Cascade)
+
+  @@unique([stockCode, dividendYear, dataSlot])
+  @@index([dividendYear, dataSlot])
+  @@map("dividends")
+}
+
+// 用户收藏表
+model UserFavorite {
+  id          BigInt    @id @default(autoincrement())
+  userId      BigInt
+  investorId  BigInt
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  investor    Investor  @relation(fields: [investorId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, investorId])
+  @@index([userId])
+  @@map("user_favorites")
+}
+
+// 自选股表
+model Watchlist {
+  id          BigInt   @id @default(autoincrement())
+  userId      BigInt
+  stockCode   String   @db.VarChar(10)
+  stockName   String   @db.VarChar(100)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stock       Stock    @relation(fields: [stockCode], references: [code], onDelete: Cascade)
+
+  @@unique([userId, stockCode])
+  @@index([userId])
+  @@index([stockCode])
+  @@map("watchlists")
+}
+
+// 价格提醒表
+model PriceAlert {
+  id          BigInt          @id @default(autoincrement())
+  userId      BigInt
+  stockCode   String          @db.VarChar(10)
+  stockName   String          @db.VarChar(100)
+  alertType   PriceAlertType
+  targetPrice Decimal         @db.Decimal(10, 2)
+  isActive    Boolean         @default( true)
+  triggeredAt DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([stockCode])
+  @@map("price_alerts")
+}
+
+enum PriceAlertType {
+  ABOVE
+  BELOW
+}
+
+// 通知表
+model Notification {
+  id          BigInt         @id @default(autoincrement())
+  userId      BigInt
+  type        NotificationType
+  title       String         @db.VarChar(200)
+  content     String         @db.Text
+  isRead      Boolean        @default(false)
+  relatedId   BigInt?
+  createdAt   DateTime       @default(now())
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  PRICE_ALERT
+  SYSTEM
+  VIP_EXPIRED
+  ORDER_PAID
+  ORDER_REFUNDED
+}
+
+// 同步日志表
+model SyncLog {
+  id          BigInt          @id @default(autoincrement())
+  taskName    String          @db.VarChar(50)
+  status      SyncStatus
+  message     String?         @db.Text
+  startTime   DateTime
+  endTime     DateTime?
+  recordCount Int?
+  createdAt   DateTime       @default(now())
+
+  @@index([taskName])
+  @@index([status])
+  @@index([startTime])
+  @@map("sync_logs")
+}
+
+enum SyncStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+enum BusinessDataSlot {
+  PRIMARY
+  SECONDARY
+}
+
+model BusinessDataSourceState {
+  id                  Int              @id
+  activeSlot          BusinessDataSlot @default(PRIMARY)
+  latestFullSyncDate  String?          @db.VarChar(20)
+  latestDailySyncDate String?          @db.VarChar(20)
+  lastPreparedSlot    BusinessDataSlot?
+  lastSwitchAt        DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@map("business_data_source_state")
+}
+
+// API Key 表
+model ApiKey {
+  id          BigInt   @id @default(autoincrement())
+  userId      BigInt
+  keyHash     String   @unique @db.VarChar(255)
+  keyPrefix   String?  @db.VarChar(16)
+  plan        ApiPlan  @default(FREE)
+  quota       Int      @default(1000)
+  used        Int      @default(0)
+  expiresAt   DateTime?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usageLogs   ApiUsageLog[]
+
+  @@index([userId])
+  @@map("api_keys")
+}
+
+enum ApiPlan {
+  FREE
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+// API 使用日志表
+model ApiUsageLog {
+  id          BigInt   @id @default(autoincrement())
+  apiKeyId    BigInt
+  endpoint    String   @db.VarChar(200)
+  method      String   @db.VarChar(10)
+  statusCode  Int
+  responseTime Int
+  ip          String?  @db.VarChar(50)
+  createdAt   DateTime @default(now())
+  apiKey      ApiKey   @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@index([apiKeyId])
+  @@index([createdAt])
+  @@map("api_usage_logs")
+}
+
+// 订单表
+model Order {
+  id          BigInt       @id @default(autoincrement())
+  orderNo     String       @unique @db.VarChar(50)
+  userId      BigInt
+  plan        MemberPlan   @default(VIP_MONTHLY)
+  amount      Decimal      @db.Decimal(10, 2)
+  status      OrderStatus  @default(PENDING)
+  paymentType PaymentType
+  expiresAt   DateTime
+  paidAt      DateTime?
+  refundedAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([orderNo])
+  @@index([status])
+  @@map("orders")
+}
+
+model PaymentSetting {
+  id           BigInt      @id @default(autoincrement())
+  paymentType  PaymentType @unique
+  qrCodeUrl    String?     @db.VarChar(500)
+  accountName  String?     @db.VarChar(100)
+  instructions String?     @db.Text
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([isActive])
+  @@map("payment_settings")
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  REFUNDED
+  EXPIRED
+}
+
+enum PaymentType {
+  WECHAT
+  ALIPAY
+}
+
+enum MemberPlan {
+  VIP_MONTHLY
+  VIP_YEARLY
+  LIFETIME
+}
+
+// 会员记录表
+model MemberLog {
+  id          BigInt        @id @default(autoincrement())
+  userId      BigInt
+  plan        MemberPlan
+  amount      Decimal       @db.Decimal(10, 2)
+  startsAt    DateTime
+  expiresAt   DateTime
+  orderNo     String        @db.VarChar(50)
+  createdAt   DateTime      @default(now())
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("member_logs")
+}
+
+// 广告表
+model Ad {
+  id          BigInt   @id @default(autoincrement())
+  position    AdPosition
+  mediaType   AdMediaType @default(IMAGE)
+  title       String   @db.VarChar(100)
+  content     String   @db.VarChar(500)
+  imageUrl    String?  @db.VarChar(500)
+  videoUrl    String?  @db.VarChar(500)
+  linkUrl     String   @db.VarChar(500)
+  isActive    Boolean  @default(true)
+  priority    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  adLogs      AdLog[]
+
+  @@index([position])
+  @@index([isActive])
+  @@map("ads")
+}
+
+enum AdMediaType {
+  IMAGE
+  VIDEO
+}
+
+enum AdPosition {
+  HOME_TOP
+  HOME_VIDEO_HERO
+  HOME_SIDEBAR
+  ARTICLE_BOTTOM
+  MOBILE_BANNER
+}
+
+// 广告点击日志表
+model AdLog {
+  id          BigInt   @id @default(autoincrement())
+  adId        BigInt
+  userId      BigInt?
+  ip          String?  @db.VarChar(50)
+  userAgent   String?  @db.VarChar(500)
+  createdAt   DateTime @default(now())
+  ad          Ad       @relation(fields: [adId], references: [id], onDelete: Cascade)
+
+  @@index([adId])
+  @@index([createdAt])
+  @@map("ad_logs")
+}
+
+model Video {
+  id          BigInt           @id @default(autoincrement())
+  title       String           @db.VarChar(200)
+  summary     String?          @db.VarChar(1000)
+  description String?          @db.Text
+  coverUrl    String?          @db.VarChar(500)
+  videoUrl    String           @db.VarChar(500)
+  durationSec Int?
+  accessLevel VideoAccessLevel @default(PUBLIC)
+  isActive    Boolean          @default(true)
+  isFeatured  Boolean          @default(false)
+  sortOrder   Int              @default(0)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([isActive, sortOrder], map: "idx_videos_active_sort")
+  @@index([accessLevel, isActive], map: "idx_videos_access_active")
+  @@index([isFeatured, isActive], map: "idx_videos_featured_active")
+  @@map("videos")
+}
+
+enum VideoAccessLevel {
+  PUBLIC
+  USER
+  VIDEO
+  VIP
+}
+
+// ==================== DataFetch 模块新增模型 ====================
+
+// 公司简介
+model CompanyIntro {
+  id        BigInt   @id @default(autoincrement())
+  stockCode String   @db.VarChar(10)
+  name      String   @db.VarChar(100)
+  ename     String?  @db.VarChar(200)
+  market    String?  @db.VarChar(50)
+  idea      String?  @db.Text
+  ldate     String?  @db.VarChar(20)
+  sprice    String?  @db.VarChar(20)
+  principal String?  @db.VarChar(100)
+  rdate     String?  @db.VarChar(20)
+  rprice    String?  @db.VarChar(20)
+  organ     String?  @db.VarChar(100)
+  secre     String?  @db.VarChar(50)
+  phone     String?  @db.VarChar(20)
+  fax       String?  @db.VarChar(20)
+  email     String?  @db.VarChar(100)
+  site      String?  @db.VarChar(200)
+  addr      String?  @db.Text
+  desc      String?  @db.Text
+  bscope    String?  @db.Text
+  pe        String?  @db.VarChar(20)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([stockCode])
+  @@index([stockCode])
+  @@map("company_intros")
+}
+
+// 公司股本
+model CompanyCapital {
+  id        BigInt   @id @default(autoincrement())
+  stockCode String   @db.VarChar(10)
+  zgb       Decimal? @db.Decimal(20, 2)  // 总股本
+  ysltag    Decimal? @db.Decimal(20, 2)  // 已流通 A 股
+  xsltgf    Decimal? @db.Decimal(20, 2)  // 未流通股份
+  bdrq      String?  @db.VarChar(20)     // 变动日期
+  plrq      String?  @db.VarChar(20)     // 披露日期
+  createdAt DateTime @default(now())
+
+  @@index([stockCode])
+  @@map("company_capitals")
+}
+
+// 解禁限售
+model LiftRestriction {
+  id        BigInt   @id @default(autoincrement())
+  stockCode String   @db.VarChar(10)
+  rdate     String?  @db.VarChar(20)     // 解禁日期
+  ramount   Decimal? @db.Decimal(20, 2)  // 解禁金额
+  rprice    Decimal? @db.Decimal(10, 2)  // 解禁价格
+  batch     String?  @db.VarChar(50)     // 批次
+  pdate     String?  @db.VarChar(20)     // 公布日期
+  createdAt DateTime @default(now())
+
+  @@index([stockCode])
+  @@map("lift_restrictions")
+}
+
+// 公司股东数
+model CompanyShareholderCount {
+  id        BigInt   @id @default(autoincrement())
+  stockCode String   @db.VarChar(10)
+  plrq      String?  @db.VarChar(20)     // 披露日期
+  jzrq      String?  @db.VarChar(20)     // 截止日期
+  gdzs      Int?     // 股东总数
+  agdhs     Int?     // A 股股东户数
+  bgdhs     Int?     // B 股股东户数
+  hgdhs     Int?     // 港股股东户数
+  yltgdhs   Int?     // 无限售条件股东户数
+  wltgdhs   Int?     // 有限售条件股东户数
+  createdAt DateTime @default(now())
+
+  @@index([stockCode])
+  @@map("company_shareholder_counts")
+}
+
+// 公司十大股东
+model CompanyTopHolders {
+  id        BigInt   @id @default(autoincrement())
+  stockCode String   @db.VarChar(10)
+  plrq      String?  @db.VarChar(20)     // 披露日期
+  jzrq      String?  @db.VarChar(20)     // 截止日期
+  gdmc      String?  @db.VarChar(200)    // 股东名称
+  gdlx      String?  @db.VarChar(50)     // 股东类型
+  cgsl      Decimal? @db.Decimal(20, 2)  // 持股数量
+  bdyy      String?  @db.Text            // 变动原因
+  cgbl      Decimal? @db.Decimal(5, 2)   // 持股比例
+  gfxz      String?  @db.VarChar(50)     // 股份性质
+  cgpm      String?  @db.VarChar(50)     // 持排名
+  createdAt DateTime @default(now())
+
+  @@index([stockCode])
+  @@map("company_top_holders")
+}
+
+// 公司十大流通股东
+model CompanyTopFlowHolders {
+  id        BigInt   @id @default(autoincrement())
+  stockCode String   @db.VarChar(10)
+  ggrq      String?  @db.VarChar(20)     // 公告日期
+  jzrq      String?  @db.VarChar(20)     // 截止日期
+  gdmc      String?  @db.VarChar(200)    // 股东名称
+  gdlx      String?  @db.VarChar(50)     // 股东类型
+  cgsl      Decimal? @db.Decimal(20, 2)  // 持股数量
+  bdyy      String?  @db.Text            // 变动原因
+  cgbl      Decimal? @db.Decimal(5, 2)   // 持股比例
+  gfxz      String?  @db.VarChar(50)     // 股份性质
+  cgpm      String?  @db.VarChar(50)     // 持排名
+  createdAt DateTime @default(now())
+
+  @@index([stockCode])
+  @@map("company_top_flow_holders")
+}
+
+// 科创股票实时数据
+model KcStockRealTimeData {
+  id        BigInt   @id @default(autoincrement())
+  stockCode String   @db.VarChar(10)
+  p         Decimal? @db.Decimal(10, 2)  // 现价
+  o         Decimal? @db.Decimal(10, 2)  // 今开
+  h         Decimal? @db.Decimal(10, 2)  // 最高
+  l         Decimal? @db.Decimal(10, 2)  // 最低
+  yc        Decimal? @db.Decimal(10, 2)  // 昨收
+  cje       Decimal? @db.Decimal(20, 2)  // 成交额
+  v         Decimal? @db.Decimal(20, 2)  // 成交量
+  pv        Decimal? @db.Decimal(10, 2)  // 市盈率
+  ud        Decimal? @db.Decimal(10, 2)  // 涨跌
+  pc        Decimal? @db.Decimal(10, 2)  // 涨跌率
+  zf        Decimal? @db.Decimal(10, 2)  // 振幅
+  t         DateTime @db.Timestamp       // 更新时间
+  pe        Decimal? @db.Decimal(10, 2)  // 市盈率
+  tr        Decimal? @db.Decimal(10, 2)  // 换手率
+  pbRatio   Decimal? @db.Decimal(10, 2)  // 市净率
+  tv        Decimal? @db.Decimal(20, 2)  // 总市值
+  createdAt DateTime @default(now())
+
+  @@unique([stockCode, t])
+  @@index([stockCode])
+  @@map("kc_stock_real_time_data")
+}
+
+// 沪深指数实时数据
+model HsIndexRealTimeData {
+  id        BigInt   @id @default(autoincrement())
+  indexCode String   @db.VarChar(20)
+  p         Decimal? @db.Decimal(10, 2)
+  o         Decimal? @db.Decimal(10, 2)
+  h         Decimal? @db.Decimal(10, 2)
+  l         Decimal? @db.Decimal(10, 2)
+  yc        Decimal? @db.Decimal(10, 2)
+  cje       Decimal? @db.Decimal(20, 2)
+  v         Decimal? @db.Decimal(20, 2)
+  pv        Decimal? @db.Decimal(10, 2)
+  ud        Decimal? @db.Decimal(10, 2)
+  pc        Decimal? @db.Decimal(10, 2)
+  zf        Decimal? @db.Decimal(10, 2)
+  t         DateTime @db.Timestamp
+  createdAt DateTime @default(now())
+
+  @@unique([indexCode, t])
+  @@index([indexCode])
+  @@map("hs_index_real_time_data")
+}
+
+// 沪深基金实时数据
+model HfFundRealTimeData {
+  id        BigInt   @id @default(autoincrement())
+  fundCode  String   @db.VarChar(20)
+  p         Decimal? @db.Decimal(10, 2)
+  o         Decimal? @db.Decimal(10, 2)
+  h         Decimal? @db.Decimal(10, 2)
+  l         Decimal? @db.Decimal(10, 2)
+  yc        Decimal? @db.Decimal(10, 2)
+  cje       Decimal? @db.Decimal(20, 2)
+  v         Decimal? @db.Decimal(20, 2)
+  pv        Decimal? @db.Decimal(10, 2)
+  ud        Decimal? @db.Decimal(10, 2)
+  pc        Decimal? @db.Decimal(10, 2)
+  zf        Decimal? @db.Decimal(10, 2)
+  t         DateTime @db.Timestamp
+  pe        Decimal? @db.Decimal(10, 2)
+  tr        Decimal? @db.Decimal(10, 2)
+  pbRatio   Decimal? @db.Decimal(10, 2)
+  tv        Decimal? @db.Decimal(20, 2)
+  createdAt DateTime @default(now())
+
+  @@unique([fundCode, t])
+  @@index([fundCode])
+  @@map("hf_fund_real_time_data")
+}
+
+// 港股实时数据
+model HkStockRealTimeData {
+  id        BigInt   @id @default(autoincrement())
+  stockCode String   @db.VarChar(20)
+  p         Decimal? @db.Decimal(10, 2)
+  o         Decimal? @db.Decimal(10, 2)
+  h         Decimal? @db.Decimal(10, 2)
+  l         Decimal? @db.Decimal(10, 2)
+  yc        Decimal? @db.Decimal(10, 2)
+  cje       Decimal? @db.Decimal(20, 2)
+  v         Decimal? @db.Decimal(20, 2)
+  pv        Decimal? @db.Decimal(10, 2)
+  ud        Decimal? @db.Decimal(10, 2)
+  pc        Decimal? @db.Decimal(10, 2)
+  zf        Decimal? @db.Decimal(10, 2)
+  t         DateTime @db.Timestamp
+  pe        Decimal? @db.Decimal(10, 2)
+  tr        Decimal? @db.Decimal(10, 2)
+  pbRatio   Decimal? @db.Decimal(10, 2)
+  tv        Decimal? @db.Decimal(20, 2)
+  updatedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@unique([stockCode, t])
+  @@index([stockCode])
+  @@map("hk_stock_real_time_data")
+}
+
+// 京市股票实时数据
+model BjStockRealTimeData {
+  id        BigInt   @id @default(autoincrement())
+  stockCode String   @db.VarChar(20)
+  p         Decimal? @db.Decimal(10, 2)
+  o         Decimal? @db.Decimal(10, 2)
+  h         Decimal? @db.Decimal(10, 2)
+  l         Decimal? @db.Decimal(10, 2)
+  yc        Decimal? @db.Decimal(10, 2)
+  cje       Decimal? @db.Decimal(20, 2)
+  v         Decimal? @db.Decimal(20, 2)
+  pv        Decimal? @db.Decimal(10, 2)
+  ud        Decimal? @db.Decimal(10, 2)
+  pc        Decimal? @db.Decimal(10, 2)
+  zf        Decimal? @db.Decimal(10, 2)
+  t         DateTime @db.Timestamp
+  pe        Decimal? @db.Decimal(10, 2)
+  tr        Decimal? @db.Decimal(10, 2)
+  pbRatio   Decimal? @db.Decimal(10, 2)
+  tv        Decimal? @db.Decimal(20, 2)
+  createdAt DateTime @default(now())
+
+  @@unique([stockCode, t])
+  @@index([stockCode])
+  @@map("bj_stock_real_time_data")
+}
+
+// ==================== HistoricalTradingData 模块模型 ====================
+
+// HS 指数历史分时交易
+model HsIndexHistoryTrading {
+  dm        String   @db.VarChar(20) // 指数代码
+  t         String   @db.VarChar(25) // 交易时间
+  o         Decimal? @db.Decimal(15, 4) // 开盘价
+  h         Decimal? @db.Decimal(15, 4) // 最高价
+  l         Decimal? @db.Decimal(15, 4) // 最低价
+  c         Decimal? @db.Decimal(15, 4) // 收盘价
+  v         Decimal? @db.Decimal(20, 2) // 成交量
+  a         Decimal? @db.Decimal(20, 2) // 成交额
+  pc        Decimal? @db.Decimal(15, 4) // 前收盘价
+  st        String?  @db.VarChar(20) // 开始时间
+  et        String?  @db.VarChar(20) // 结束时间
+  createdAt DateTime @default(now())
+
+  @@unique([dm, t])
+  @@index([dm])
+  @@map("hs_index_history_trading")
+}
+
+// HS 指数最新分时交易
+model HsIndexLatestTrading {
+  dm        String   @db.VarChar(20) // 指数代码
+  t         String   @db.VarChar(25) // 交易时间
+  o         Decimal? @db.Decimal(15, 4) // 开盘价
+  h         Decimal? @db.Decimal(15, 4) // 最高价
+  l         Decimal? @db.Decimal(15, 4) // 最低价
+  c         Decimal? @db.Decimal(15, 4) // 收盘价
+  v         Decimal? @db.Decimal(20, 2) // 成交量
+  a         Decimal? @db.Decimal(20, 2) // 成交额
+  pc        Decimal? @db.Decimal(15, 4) // 前收盘价
+  createdAt DateTime @default(now())
+
+  @@unique([dm, t])
+  @@index([dm])
+  @@map("hs_index_latest_trading")
+}
+
+// HS 股票最新分时交易
+model HsStockLatestTrading {
+  dm        String   @db.VarChar(20) // 股票代码
+  t         String   @db.VarChar(25) // 交易时间
+  model     String?  @db.VarChar(10) // 除权方式
+  o         Decimal? @db.Decimal(15, 4) // 开盘价
+  h         Decimal? @db.Decimal(15, 4) // 最高价
+  l         Decimal? @db.Decimal(15, 4) // 最低价
+  c         Decimal? @db.Decimal(15, 4) // 收盘价
+  v         Decimal? @db.Decimal(20, 2) // 成交量
+  a         Decimal? @db.Decimal(20, 2) // 成交额
+  pc        Decimal? @db.Decimal(15, 4) // 前收盘价
+  sf        Int?     // 停牌 1 停牌，0 不停牌
+  createdAt DateTime @default(now())
+
+  @@unique([dm, t])
+  @@index([dm])
+  @@map("hs_stock_latest_trading")
+}
+
+// HS 股票历史分时交易
+model HsStockHistoryTrading {
+  dm        String   @db.VarChar(20) // 股票代码
+  t         String   @db.VarChar(25) // 交易时间
+  model     String   @db.VarChar(10) // 除权方式
+  o         Decimal? @db.Decimal(15, 4) // 开盘价
+  h         Decimal? @db.Decimal(15, 4) // 最高价
+  l         Decimal? @db.Decimal(15, 4) // 最低价
+  c         Decimal? @db.Decimal(15, 4) // 收盘价
+  v         Decimal? @db.Decimal(20, 2) // 成交量
+  a         Decimal? @db.Decimal(20, 2) // 成交额
+  pc        Decimal? @db.Decimal(15, 4) // 前收盘价
+  sf        Int?     // 停牌 1 停牌，0 不停牌
+  createdAt DateTime @default(now())
+
+  @@unique([dm, t, model])
+  @@index([dm])
+  @@map("hs_stock_history_trading")
+}
+
+// ==================== FinancialCoreIndicators 模块模型 ====================
+
+// 财务主要指标
+model FinancialMainIndicators {
+  id        BigInt   @id @default(autoincrement())
+  dm        String   @db.VarChar(20) // 股票代码
+  jzrq      String   @db.VarChar(20) // 截止日期
+  plrq      String?  @db.VarChar(20) // 披露日期
+  mgjyhdxjl Decimal? @db.Decimal(15, 4) // 每股经营活动现金流量
+  mgjzc     Decimal? @db.Decimal(15, 4) // 每股净资产
+  jbmgsy    Decimal? @db.Decimal(15, 4) // 基本每股收益
+  xsmgsy    Decimal? @db.Decimal(15, 4) // 稀释每股收益
+  mgwfplr   Decimal? @db.Decimal(15, 4) // 每股未分配利润
+  mgzbgjj   Decimal? @db.Decimal(15, 4) // 每股资本公积金
+  kfmgsy    Decimal? @db.Decimal(15, 4) // 扣非每股收益
+  jzcsyl    Decimal? @db.Decimal(15, 4) // 净资产收益率
+  xsmlv     Decimal? @db.Decimal(15, 4) // 销售毛利率
+  zyyrsrzz  Decimal? @db.Decimal(15, 4) // 主营收入同比增长
+  jlrzz     Decimal? @db.Decimal(15, 4) // 净利润同比增长
+  gsmgsyzzdjlrzz Decimal? @db.Decimal(15, 4) // 归属于母公司所有者的净利润同比增长
+  kfjlrzz   Decimal? @db.Decimal(15, 4) // 扣非净利润同比增长
+  yyzsrgdhbzz Decimal? @db.Decimal(15, 4) // 营业总收入滚动环比增长
+  sljlrjqhbzz Decimal? @db.Decimal(15, 4) // 归属净利润滚动环比增长
+  kfjlrgdhbzz Decimal? @db.Decimal(15, 4) // 扣非净利润滚动环比增长
+  jqjzcsyl  Decimal? @db.Decimal(15, 4) // 加权净资产收益率
+  tbjzcsyl  Decimal? @db.Decimal(15, 4) // 摊薄净资产收益率
+  tbzzcsyl  Decimal? @db.Decimal(15, 4) // 摊薄总资产收益率
+  mlv       Decimal? @db.Decimal(15, 4) // 毛利率
+  jlv       Decimal? @db.Decimal(15, 4) // 净利率
+  sjslv     Decimal? @db.Decimal(15, 4) // 实际税率
+  yskyysr   Decimal? @db.Decimal(15, 4) // 预收款营业收入
+  xsxjlyysr Decimal? @db.Decimal(15, 4) // 销售现金流营业收入
+  zcfzl     Decimal? @db.Decimal(15, 4) // 资产负债比率
+  chzzl     Decimal? @db.Decimal(15, 4) // 存货周转率
+  createdAt DateTime @default(now())
+
+  @@unique([dm, jzrq])
+  @@index([dm])
+  @@map("financial_main_indicators")
+}
+
+// 财务指标
+model FinancialIndicators {
+  id        BigInt   @id @default(autoincrement())
+  dm        String   @db.VarChar(20) // 股票代码
+  date      String   @db.VarChar(20) // 报告日期
+  tbmg      String?  @db.VarChar(50) // 摊薄每股收益
+  jqmg      String?  @db.VarChar(50) // 加权每股收益
+  mgsy      String?  @db.VarChar(50) // 每股收益_调整后
+  kfmg      String?  @db.VarChar(50) // 扣除非经常性损益后的每股收益
+  mgjz      String?  @db.VarChar(50) // 每股净资产_调整前
+  mgjzad    String?  @db.VarChar(50) // 每股净资产_调整后
+  mgjy      String?  @db.VarChar(50) // 每股经营性现金流
+  mggjj     String?  @db.VarChar(50) // 每股资本公积金
+  mgwly     String?  @db.VarChar(50) // 每股未分配利润
+  zclr      String?  @db.VarChar(50) // 总资产利润率
+  zylr      String?  @db.VarChar(50) // 主营业务利润率
+  zzlr      String?  @db.VarChar(50) // 总资产净利润率
+  cblr      String?  @db.VarChar(50) // 成本费用利润率
+  yylr      String?  @db.VarChar(50) // 营业利润率
+  zycb      String?  @db.VarChar(50) // 主营业务成本率
+  xsjl      String?  @db.VarChar(50) // 销售净利率
+  gbbc      String?  @db.VarChar(50) // 股本报酬率
+  jzbc      String?  @db.VarChar(50) // 净资产报酬率
+  zcbc      String?  @db.VarChar(50) // 资产报酬率
+  xsml      String?  @db.VarChar(50) // 销售毛利率
+  xxbz      String?  @db.VarChar(50) // 三项费用比重
+  fzy       String?  @db.VarChar(50) // 非主营比重
+  zybz      String?  @db.VarChar(50) // 主营利润比重
+  gxff      String?  @db.VarChar(50) // 股息发放率
+  tzsy      String?  @db.VarChar(50) // 投资收益率
+  zyyw      String?  @db.VarChar(50) // 主营业务利润
+  jzsy      String?  @db.VarChar(50) // 净资产收益率
+  jqjz      String?  @db.VarChar(50) // 加权净资产收益率
+  kflr      String?  @db.VarChar(50) // 扣除非经常性损益后的净利润
+  zysr      String?  @db.VarChar(50) // 主营业务收入增长率
+  jlzz      String?  @db.VarChar(50) // 净利润增长率
+  jzzz      String?  @db.VarChar(50) // 净资产增长率
+  zzzz      String?  @db.VarChar(50) // 总资产增长率
+  yszz      String?  @db.VarChar(50) // 应收账款周转率
+  yszzt     String?  @db.VarChar(50) // 应收账款周转天数
+  chzz      String?  @db.VarChar(50) // 存货周转天数
+  chzzl     String?  @db.VarChar(50) // 存货周转率
+  gzzz      String?  @db.VarChar(50) // 固定资产周转率
+  zzzzl     String?  @db.VarChar(50) // 总资产周转率
+  zzzzt     String?  @db.VarChar(50) // 总资产周转天数
+  ldzz      String?  @db.VarChar(50) // 流动资产周转率
+  ldzzt     String?  @db.VarChar(50) // 流动资产周转天数
+  gdzz      String?  @db.VarChar(50) // 股东权益周转率
+  ldbl      String?  @db.VarChar(50) // 流动比率
+  sdbl      String?  @db.VarChar(50) // 速动比率
+  xjbl      String?  @db.VarChar(50) // 现金比率
+  lxzf      String?  @db.VarChar(50) // 利息支付倍数
+  zjbl      String?  @db.VarChar(50) // 长期债务与营运资金比率
+  gdqy      String?  @db.VarChar(50) // 股东权益比率
+  cqfz      String?  @db.VarChar(50) // 长期负债比率
+  gdgd      String?  @db.VarChar(50) // 股东权益与固定资产比率
+  fzqy      String?  @db.VarChar(50) // 负债与所有者权益比率
+  zczjbl    String?  @db.VarChar(50) // 长期资产与长期资金比率
+  zblv      String?  @db.VarChar(50) // 资本化比率
+  gdzcjz    String?  @db.VarChar(50) // 固定资产净值率
+  zbgdh     String?  @db.VarChar(50) // 资本固定化比率
+  cqbl      String?  @db.VarChar(50) // 产权比率
+  qxjzb     String?  @db.VarChar(50) // 清算价值比率
+  gdzcbz    String?  @db.VarChar(50) // 固定资产比重
+  zcfzl     String?  @db.VarChar(50) // 资产负债率
+  zzc       String?  @db.VarChar(50) // 总资产
+  jyxj      String?  @db.VarChar(50) // 经营现金净流量对销售收入比率
+  zcjyxj    String?  @db.VarChar(50) // 资产的经营现金流量回报率
+  jylrb     String?  @db.VarChar(50) // 经营现金净流量与净利润的比率
+  jyfzl     String?  @db.VarChar(50) // 经营现金净流量对负债比率
+  xjlbl     String?  @db.VarChar(50) // 现金流量比率
+  dqgptz    String?  @db.VarChar(50) // 短期股票投资
+  dqzctz    String?  @db.VarChar(50) // 短期债券投资
+  dqjytz    String?  @db.VarChar(50) // 短期其它经营性投资
+  qcgptz    String?  @db.VarChar(50) // 长期股票投资
+  cqzqtz    String?  @db.VarChar(50) // 长期债券投资
+  cqjyxtz   String?  @db.VarChar(50) // 长期其它经营性投资
+  yszk1     String?  @db.VarChar(50) // 1 年以内应收帐款
+  yszk12    String?  @db.VarChar(50) // 1-2 年以内应收帐款
+  yszk23    String?  @db.VarChar(50) // 2-3 年以内应收帐款
+  yszk3     String?  @db.VarChar(50) // 3 年以内应收帐款
+  yfhk1     String?  @db.VarChar(50) // 1 年以内预付货款
+  yfhk12    String?  @db.VarChar(50) // 1-2 年以内预付货款
+  yfhk23    String?  @db.VarChar(50) // 2-3 年以内预付货款
+  yfhk3     String?  @db.VarChar(50) // 3 年以内预付货款
+  ysk1      String?  @db.VarChar(50) // 1 年以内其它应收款
+  ysk12     String?  @db.VarChar(50) // 1-2 年以内其它应收款
+  ysk23     String?  @db.VarChar(50) // 2-3 年以内其它应收款
+  ysk3      String?  @db.VarChar(50) // 3 年以内其它应收款
+  createdAt DateTime @default(now())
+
+  @@unique([dm, date])
+  @@index([dm])
+  @@map("financial_indicators")
+}
+
+// 近年业绩预告
+model PerformanceForecast {
+  id        BigInt   @id @default(autoincrement())
+  dm        String   @db.VarChar(20) // 股票代码
+  pdate     String   @db.VarChar(20) // 公告日期
+  rdate     String?  @db.VarChar(20) // 报告期
+  type      String?  @db.VarChar(100) // 类型
+  abs       String?  @db.VarChar(5000) // 业绩预告摘要
+  old       String?  @db.VarChar(50) // 上年同期每股收益
+  createdAt DateTime @default(now())
+
+  @@unique([dm, pdate])
+  @@index([dm])
+  @@map("performance_forecast")
+}
+
+// 跌停股池
+model LimitDownPool {
+  dm        String   @db.VarChar(20) // 代码
+  date      String   @db.VarChar(20) // 日期参数
+  mc        String?  @db.VarChar(200) // 名称
+  p         Decimal? @db.Decimal(15, 4) // 价格（元）
+  zf        Decimal? @db.Decimal(10, 2) // 跌幅（%）
+  cje       Decimal? @db.Decimal(20, 2) // 成交额（元）
+  lt        Decimal? @db.Decimal(20, 2) // 流通市值（元）
+  zsz       Decimal? @db.Decimal(20, 2) // 总市值（元）
+  pe        Decimal? @db.Decimal(15, 4) // 动态市盈率
+  hs        Decimal? @db.Decimal(10, 2) // 换手率（%）
+  lbc       Decimal? @db.Decimal(5, 2) // 连续跌停次数
+  lbt       String   @db.VarChar(20) // 最后封板时间（HH:mm:ss）
+  zj        Decimal? @db.Decimal(20, 2) // 封单资金（元）
+  fba       Decimal? @db.Decimal(20, 2) // 板上成交额（元）
+  zbc       Decimal? @db.Decimal(5, 2) // 开板次数
+  createdAt DateTime @default(now())
+
+  @@unique([dm, date, lbt])
+  @@index([dm])
+  @@index([date])
+  @@map("limit_down_pool")
+}
+
+// 强势股池
+model StrongPool {
+  dm        String   @db.VarChar(20) // 代码
+  date      String   @db.VarChar(20) // 日期参数
+  mc        String?  @db.VarChar(200) // 名称
+  p         Decimal? @db.Decimal(15, 4) // 价格（元）
+  ztp       Decimal? @db.Decimal(15, 4) // 涨停价（元）
+  zf        Decimal? @db.Decimal(10, 2) // 涨幅（%）
+  cje       Decimal? @db.Decimal(20, 2) // 成交额（元）
+  lt        Decimal? @db.Decimal(20, 2) // 流通市值（元）
+  zsz       Decimal? @db.Decimal(20, 2) // 总市值（元）
+  zs        Decimal? @db.Decimal(10, 2) // 涨速（%）
+  nh        Decimal? @db.Decimal(5, 2) // 是否新高（0：否，1：是）
+  lb        Decimal? @db.Decimal(10, 2) // 量比
+  hs        Decimal? @db.Decimal(10, 2) // 换手率（%）
+  tj        String   @db.VarChar(50) // 涨停统计（x 天/y 板）
+  createdAt DateTime @default(now())
+
+  @@unique([dm, date, tj])
+  @@index([dm])
+  @@index([date])
+  @@map("strong_pool")
+}
+
+// 炸板股池
+model LimitUpBreakPool {
+  dm        String   @db.VarChar(20) // 代码
+  date      String   @db.VarChar(20) // 日期参数
+  mc        String?  @db.VarChar(200) // 名称
+  p         Decimal? @db.Decimal(15, 4) // 价格（元）
+  ztp       Decimal? @db.Decimal(15, 4) // 涨停价（元）
+  zf        Decimal? @db.Decimal(10, 2) // 涨跌幅（%）
+  cje       Decimal? @db.Decimal(20, 2) // 成交额（元）
+  lt        Decimal? @db.Decimal(20, 2) // 流通市值（元）
+  zsz       Decimal? @db.Decimal(20, 2) // 总市值（元）
+  zs        Decimal? @db.Decimal(10, 2) // 涨速（%）
+  hs        Decimal? @db.Decimal(10, 2) // 转手率（%）
+  tj        String?  @db.VarChar(50) // 涨停统计（x 天/y 板）
+  fbt       String   @db.VarChar(20) // 首次封板时间（HH:mm:ss）
+  zbc       Decimal? @db.Decimal(5, 2) // 炸板次数
+  createdAt DateTime @default(now())
+
+  @@unique([dm, date, fbt])
+  @@index([dm])
+  @@index([date])
+  @@map("limit_up_break_pool")
+}
+
+// 涨停股池
+model LimitUpPool {
+  dm        String   @db.VarChar(20) // 代码
+  date      String   @db.VarChar(20) // 日期参数
+  mc        String?  @db.VarChar(200) // 名称
+  p         Decimal? @db.Decimal(15, 4) // 价格（元）
+  zf        Decimal? @db.Decimal(10, 2) // 涨幅（%）
+  cje       Decimal? @db.Decimal(20, 2) // 成交额（元）
+  lt        Decimal? @db.Decimal(20, 2) // 流通市值（元）
+  zsz       Decimal? @db.Decimal(20, 2) // 总市值（元）
+  hs        Decimal? @db.Decimal(10, 2) // 换手率（%）
+  lbc       Decimal? @db.Decimal(5, 2) // 连板数
+  fbt       String   @db.VarChar(20) // 首次封板时间（HH:mm:ss）
+  lbt       String   @db.VarChar(20) // 最后封板时间（HH:mm:ss）
+  zj        Decimal? @db.Decimal(20, 2) // 封板资金（元）
+  zbc       Decimal? @db.Decimal(5, 2) // 炸板次数
+  tj        String?  @db.VarChar(50) // 涨停统计（x 天/y 板）
+  hy        String?  @db.VarChar(200) // 所属行业
+  createdAt DateTime @default(now())
+
+  @@unique([dm, date, fbt, lbt])
+  @@index([dm])
+  @@index([date])
+  @@map("limit_up_pool")
+}
+
+// 次新股池
+model SubNewPool {
+  dm        String   @db.VarChar(20) // 代码
+  date      String   @db.VarChar(20) // 日期参数
+  mc        String?  @db.VarChar(200) // 名称
+  p         Decimal? @db.Decimal(15, 4) // 价格（元）
+  ztp       Decimal? @db.Decimal(15, 4) // 涨停价（元，无涨停价为 null）
+  zf        Decimal? @db.Decimal(10, 2) // 涨跌幅（%）
+  cje       Decimal? @db.Decimal(20, 2) // 成交额（元）
+  lt        Decimal? @db.Decimal(20, 2) // 流通市值（元）
+  zsz       Decimal? @db.Decimal(20, 2) // 总市值（元）
+  nh        Decimal? @db.Decimal(5, 2) // 是否新高（0：否，1：是）
+  hs        Decimal? @db.Decimal(10, 2) // 转手率（%）
+  tj        String?  @db.VarChar(50) // 涨停统计（x 天/y 板）
+  kb        Decimal? @db.Decimal(5, 2) // 开板几日
+  od        String   @db.VarChar(20) // 开板日期（yyyyMMdd）
+  ipod      String   @db.VarChar(20) // 上市日期（yyyyMMdd）
+  createdAt DateTime @default(now())
+
+  @@unique([dm, date, od, ipod])
+  @@index([dm])
+  @@index([date])
+  @@map("sub_new_pool")
+}
+
+// 股票列表
+model StockList {
+  dm        String   @db.VarChar(20) // 股票代码
+  mc        String?  @db.VarChar(200) // 股票名称
+  jys       String?  @db.VarChar(10) // 交易所
+  updatedAt DateTime? @db.Date // 更新时间
+  createdAt DateTime @default(now())
+
+  @@unique([dm])
+  @@index([dm])
+  @@map("stock_list")
+}
+
+// 沪深基金列表
+model HsFundList {
+  dm        String   @db.VarChar(30) // 基金代码
+  mc        String?  @db.VarChar(200) // 基金名称
+  jys       String?  @db.VarChar(10) // 交易所
+  updatedAt DateTime? @db.Date // 更新时间
+  createdAt DateTime @default(now())
+
+  @@unique([dm])
+  @@index([dm])
+  @@map("hs_fund_list")
+}
+
+// 沪深主要指数列表
+model HsMainIndexList {
+  dm        String   @db.VarChar(30) // 指数代码
+  mc        String?  @db.VarChar(200) // 指数名称
+  jys       String?  @db.VarChar(10) // 交易所
+  updatedAt DateTime? @db.Date // 更新时间
+  createdAt DateTime @default(now())
+
+  @@unique([dm])
+  @@index([dm])
+  @@map("hs_main_index_list")
+}
+
+// 新股日历
+model NewStockCalendar {
+  zqdm      String   @db.VarChar(30) // 股票代码
+  zqjc      String?  @db.VarChar(200) // 股票简称
+  sgdm      String?  @db.VarChar(30) // 申购代码
+  fxsl      Decimal? @db.Decimal(20, 2) // 发行总数（股）
+  swfxsl    Decimal? @db.Decimal(20, 2) // 网上发行（股）
+  sgsx      Decimal? @db.Decimal(20, 2) // 申购上限（股）
+  dgsz      Decimal? @db.Decimal(20, 2) // 顶格申购需配市值 (元)
+  sgrq      String?  @db.VarChar(20) // 申购日期
+  fxjg      Decimal? @db.Decimal(15, 4) // 发行价格（元）
+  zxj       Decimal? @db.Decimal(15, 4) // 最新价（元）
+  srspj     Decimal? @db.Decimal(15, 4) // 首日收盘价（元）
+  zqgbrq    String?  @db.VarChar(20) // 中签号公布日
+  zqjkrq    String?  @db.VarChar(20) // 中签缴款日
+  ssrq      String?  @db.VarChar(20) // 上市日期
+  syl       Decimal? @db.Decimal(15, 4) // 发行市盈率
+  hysyl     Decimal? @db.Decimal(15, 4) // 行业市盈率
+  wszql     Decimal? @db.Decimal(10, 4) // 中签率（%）
+  yzbsl     Decimal? @db.Decimal(5, 2) // 连续一字板数量
+  zf        Decimal? @db.Decimal(10, 2) // 涨幅（%）
+  yqhl      Decimal? @db.Decimal(20, 2) // 每中一签获利（元）
+  zyyw      String?  @db.VarChar(2000) // 主营业务
+  updatedAt DateTime? @db.Date // 更新时间
+  createdAt DateTime @default(now())
+
+  @@unique([zqdm])
+  @@index([zqdm])
+  @@map("new_stock_calendar")
+}
+
+// 港股股票列表
+model HkStockList {
+  dm        String   @db.VarChar(30) // 股票代码
+  mc        String?  @db.VarChar(200) // 股票名称
+  jys       String?  @db.VarChar(50) // 交易所
+  updatedAt DateTime? @db.Date // 更新时间
+  createdAt DateTime @default(now())
+
+  @@unique([dm])
+  @@index([dm])
+  @@map("hk_stock_list")
+}
+
+// ==================== Phase 3 P2 数据模型 ====================
+
+// 利润表
+model IncomeStatement {
+  dm        String   @db.VarChar(20) // 股票代码
+  jzrq      String   @db.VarChar(20) // 截止日期
+  plrq      String   @db.VarChar(20) // 披露日期
+
+  yysr              Decimal? @db.Decimal(20, 2) // 营业收入
+  yzbf              Decimal? @db.Decimal(20, 2) // 已赚保费
+  fdczssr           Decimal? @db.Decimal(20, 2) // 房地产销售收入
+  yyzcb             Decimal? @db.Decimal(20, 2) // 营业总成本
+  fdczscb           Decimal? @db.Decimal(20, 2) // 房地产销售成本
+  yffy              Decimal? @db.Decimal(20, 2) // 研发费用
+  tbj               Decimal? @db.Decimal(20, 2) // 退保金
+  pczjje            Decimal? @db.Decimal(20, 2) // 赔付支出净额
+  tqbxhtzbjje       Decimal? @db.Decimal(20, 2) // 提取保险合同准备金净额
+  bdhlzc            Decimal? @db.Decimal(20, 2) // 保单红利支出
+  fbfy              Decimal? @db.Decimal(20, 2) // 分保费用
+  gyjzbdsy          Decimal? @db.Decimal(20, 2) // 公允价值变动收益
+  qhsy              Decimal? @db.Decimal(20, 2) // 期货损益
+  tgsy              Decimal? @db.Decimal(20, 2) // 托管收益
+  btsr              Decimal? @db.Decimal(20, 2) // 补贴收入
+  qtywlr            Decimal? @db.Decimal(20, 2) // 其他业务利润
+  bhbfzhbqsljlr     Decimal? @db.Decimal(20, 2) // 被合并方在合并前实现净利润
+  lxsr              Decimal? @db.Decimal(20, 2) // 利息收入
+  sxfjyjsr          Decimal? @db.Decimal(20, 2) // 手续费及佣金收入
+  sxfjyjzc          Decimal? @db.Decimal(20, 2) // 手续费及佣金支出
+  qtywcb            Decimal? @db.Decimal(20, 2) // 其他业务成本
+  hdsy              Decimal? @db.Decimal(20, 2) // 汇兑收益
+  fldzcczsy         Decimal? @db.Decimal(20, 2) // 非流动资产处置收益
+  sdsfy             Decimal? @db.Decimal(20, 2) // 所得税费用
+  wqrtzss           Decimal? @db.Decimal(20, 2) // 未确认投资损失
+  gsmgsyzzdjlr      Decimal? @db.Decimal(20, 2) // 归属于母公司所有者的净利润
+  lxzc              Decimal? @db.Decimal(20, 2) // 利息支出
+  qtywsr            Decimal? @db.Decimal(20, 2) // 其他业务收入
+  yyzsr             Decimal? @db.Decimal(20, 2) // 营业总收入
+  yycb              Decimal? @db.Decimal(20, 2) // 营业成本
+  yysjjfj           Decimal? @db.Decimal(20, 2) // 营业税金及附加
+  xsfy              Decimal? @db.Decimal(20, 2) // 销售费用
+  glfy              Decimal? @db.Decimal(20, 2) // 管理费用
+  cwfy              Decimal? @db.Decimal(20, 2) // 财务费用
+  zcjzss            Decimal? @db.Decimal(20, 2) // 资产减值损失
+  tzsy              Decimal? @db.Decimal(20, 2) // 投资收益
+  lyqyhhhqydtzsy    Decimal? @db.Decimal(20, 2) // 联营企业和合营企业的投资收益
+  yylr              Decimal? @db.Decimal(20, 2) // 营业利润
+  ywsr              Decimal? @db.Decimal(20, 2) // 营业外收入
+  ywzc              Decimal? @db.Decimal(20, 2) // 营业外支出
+  lze               Decimal? @db.Decimal(20, 2) // 利润总额
+  jlr               Decimal? @db.Decimal(20, 2) // 净利润
+  jlrhfcjcx         Decimal? @db.Decimal(20, 2) // 净利润 (扣除非经常性损益后)
+  ssgdsy            Decimal? @db.Decimal(20, 2) // 少数股东损益
+  jbmgsy            Decimal? @db.Decimal(10, 4) // 基本每股收益
+  xsmgsy            Decimal? @db.Decimal(10, 4) // 稀释每股收益
+  zhsyz             Decimal? @db.Decimal(20, 2) // 综合收益总额
+  gsssgdzhsyz       Decimal? @db.Decimal(20, 2) // 归属于少数股东的综合收益总额
+  qtsy              Decimal? @db.Decimal(20, 2) // 其他收益
+
+  createdAt DateTime @default(now())
+
+  @@unique([dm, jzrq, plrq])
+  @@index([dm])
+  @@map("income_statement")
+}
+
+// 现金流量表
+model CashFlowStatement {
+  dm        String   @db.VarChar(20) // 股票代码
+  jzrq      String   @db.VarChar(20) // 截止日期
+  plrq      String   @db.VarChar(20) // 披露日期
+
+  sdydbxbfqdxj          Decimal? @db.Decimal(20, 2) // 收到原保险合同保费取得的现金
+  sdzbxywxjjje          Decimal? @db.Decimal(20, 2) // 收到再保险业务现金净额
+  bhcjjtkkjzje          Decimal? @db.Decimal(20, 2) // 保户储金及投资款净增加额
+  czjyxjrzcjzje         Decimal? @db.Decimal(20, 2) // 处置交易性金融资产净增加额
+  sqlxsxfjyjdxj         Decimal? @db.Decimal(20, 2) // 收取利息、手续费及佣金的现金
+  hgywzjjzje            Decimal? @db.Decimal(20, 2) // 回购业务资金净增加额
+  zfybxhtpfkxdj         Decimal? @db.Decimal(20, 2) // 支付原保险合同赔付款项的现金
+  zfbdhldxj             Decimal? @db.Decimal(20, 2) // 支付保单红利的现金
+  czfzgsjqtsddxj        Decimal? @db.Decimal(20, 2) // 处置子公司及其他收到的现金
+  jszyhdqckssddxj       Decimal? @db.Decimal(20, 2) // 减少质押和定期存款所收到的现金
+  tzszfdxj              Decimal? @db.Decimal(20, 2) // 投资所支付的现金
+  zydkjzje              Decimal? @db.Decimal(20, 2) // 质押贷款净增加额
+  qdfzgsjqtywdwzfdxjje  Decimal? @db.Decimal(20, 2) // 取得子公司及其他营业单位支付的现金净额
+  zjzyhdqckszfdxj       Decimal? @db.Decimal(20, 2) // 增加质押和定期存款所支付的现金
+  qzfzgsxrxj            Decimal? @db.Decimal(20, 2) // 其中子公司吸收现金
+  qz_fzgszfgsssgdglr    Decimal? @db.Decimal(20, 2) // 其中：子公司支付给少数股东的股利、利润
+  ssgdsy                Decimal? @db.Decimal(20, 2) // 少数股东损益
+  wqrdtzss              Decimal? @db.Decimal(20, 2) // 未确认的投资损失
+  dysyzj_j_js           Decimal? @db.Decimal(20, 2) // 递延收益增加 (减：减少)
+  yjfz                  Decimal? @db.Decimal(20, 2) // 预计负债
+  jxyyfxmdzj            Decimal? @db.Decimal(20, 2) // 经营性应付项目的增加
+  ywgwswjskdjs_j_zj     Decimal? @db.Decimal(20, 2) // 已完工尚未结算款的减少 (减：增加)
+  yjswgwgdjz_j_js       Decimal? @db.Decimal(20, 2) // 已结算尚未完工款的增加 (减：减少)
+  xssptglwsddxj         Decimal? @db.Decimal(20, 2) // 销售商品、提供劳务收到的现金
+  khckhtyckxkjzje       Decimal? @db.Decimal(20, 2) // 客户存款和同业存放款项净增加额
+  xzyhyhkjzje           Decimal? @db.Decimal(20, 2) // 向中央银行借款净增加额
+  xtjrgjqjcrzjjzje      Decimal? @db.Decimal(20, 2) // 向其他金融机构拆入资金净增加额
+  sddsfyfh              Decimal? @db.Decimal(20, 2) // 收到的税费与返还
+  tzzfdxj               Decimal? @db.Decimal(20, 2) // 投资支付的现金
+  sdqtyjyghdxj          Decimal? @db.Decimal(20, 2) // 收到的其他与经营活动有关的现金
+  jyhdxjlrxj            Decimal? @db.Decimal(20, 2) // 经营活动现金流入小计
+  gmspjslwzfdxj         Decimal? @db.Decimal(20, 2) // 购买商品、接受劳务支付的现金
+  khdkjdknzje           Decimal? @db.Decimal(20, 2) // 客户贷款及垫款净增加额
+  cfzyxhytckxkjzje      Decimal? @db.Decimal(20, 2) // 存放中央银行和同业款项净增加额
+  zflxsxfjyjdxj         Decimal? @db.Decimal(20, 2) // 支付利息、手续费及佣金的现金
+  zfgzyjwzgzfdxj        Decimal? @db.Decimal(20, 2) // 支付给职工以及为职工支付的现金
+  zfdgxsf               Decimal? @db.Decimal(20, 2) // 支付的各项税费
+  zfqtyjyghdxj          Decimal? @db.Decimal(20, 2) // 支付其他与经营活动有关的现金
+  jyhdxjlcxj            Decimal? @db.Decimal(20, 2) // 经营活动现金流出小计
+  jyhdcsdxjlje          Decimal? @db.Decimal(20, 2) // 经营活动产生的现金流量净额
+  shtzssddxj            Decimal? @db.Decimal(20, 2) // 收回投资所收到的现金
+  qdtzsysddxj           Decimal? @db.Decimal(20, 2) // 取得投资收益所收到的现金
+  czgdzcwxzhqtqctzssddxj Decimal? @db.Decimal(20, 2) // 处置固定资产、无形资产和其他长期投资收到的现金
+  sdqtytzghdxj          Decimal? @db.Decimal(20, 2) // 收到的其他与投资活动有关的现金
+  tzhdxjlrxj            Decimal? @db.Decimal(20, 2) // 投资活动现金流入小计
+  gjgdzcwxzhqtqctzzfdxj Decimal? @db.Decimal(20, 2) // 购建固定资产、无形资产和其他长期投资支付的现金
+  tzhdxjlcxj            Decimal? @db.Decimal(20, 2) // 投资活动现金流出小计
+  tzhdcsdxjlxj          Decimal? @db.Decimal(20, 2) // 投资活动产生的现金流量净额
+  xstzsdj               Decimal? @db.Decimal(20, 2) // 吸收投资收到的现金
+  qdjkjddxj             Decimal? @db.Decimal(20, 2) // 取得借款收到的现金
+  fxzjsddxj             Decimal? @db.Decimal(20, 2) // 发行债券收到的现金
+  sdqtczghdxj           Decimal? @db.Decimal(20, 2) // 收到其他与筹资活动有关的现金
+  czhdxjlrxj            Decimal? @db.Decimal(20, 2) // 筹资活动现金流入小计
+  chzwzfxj              Decimal? @db.Decimal(20, 2) // 偿还债务支付现金
+  fpglrlhcllxzfdxj      Decimal? @db.Decimal(20, 2) // 分配股利、利润或偿付利息支付的现金
+  zfqtczdxj             Decimal? @db.Decimal(20, 2) // 支付其他与筹资的现金
+  czhdxjlcxj            Decimal? @db.Decimal(20, 2) // 筹资活动现金流出小计
+  czhdcsdxjlxj          Decimal? @db.Decimal(20, 2) // 筹资活动产生的现金流量净额
+  hlbddxjdxy            Decimal? @db.Decimal(20, 2) // 汇率变动对现金的影响
+  xjxjdhwjzje           Decimal? @db.Decimal(20, 2) // 现金及现金等价物净增加额
+  qcxjjxjdhwye          Decimal? @db.Decimal(20, 2) // 期初现金及现金等价物余额
+  qmxjjxjdhwye          Decimal? @db.Decimal(20, 2) // 期末现金及现金等价物余额
+  jlr                   Decimal? @db.Decimal(20, 2) // 净利润
+  zcjzzb                Decimal? @db.Decimal(20, 2) // 资产减值准备
+  gdzczjyqzcshscxwzczj  Decimal? @db.Decimal(20, 2) // 固定资产折旧、油气资产折耗、生产性物资折旧
+  wxzctx                Decimal? @db.Decimal(20, 2) // 无形资产摊销
+  cqdtfytx              Decimal? @db.Decimal(20, 2) // 长期待摊费用摊销
+  dtfydjs               Decimal? @db.Decimal(20, 2) // 待摊费用的减少
+  ytfydzj               Decimal? @db.Decimal(20, 2) // 预提费用的增加
+  czgdzcwxzhqtqctzss    Decimal? @db.Decimal(20, 2) // 处置固定资产、无形资产和其他长期资产的损失
+  gdzcgbss              Decimal? @db.Decimal(20, 2) // 固定资产报废损失
+  gyjzbds               Decimal? @db.Decimal(20, 2) // 公允价值变动损失
+  cwfy                  Decimal? @db.Decimal(20, 2) // 财务费用
+  tzss                  Decimal? @db.Decimal(20, 2) // 投资损失
+  dysdszcjs             Decimal? @db.Decimal(20, 2) // 递延所得税资产减少
+  dysdsfzzj             Decimal? @db.Decimal(20, 2) // 递延所得税负债增加
+  chdjs                 Decimal? @db.Decimal(20, 2) // 存货的减少
+  jxyysxmdjs            Decimal? @db.Decimal(20, 2) // 经营性应收项目的减少
+  qt                    Decimal? @db.Decimal(20, 2) // 其他
+  jyhdcsdxjlxj          Decimal? @db.Decimal(20, 2) // 经营活动产生现金流量净额
+  zwzwzb                Decimal? @db.Decimal(20, 2) // 债务转为资本
+  ynndqdkzhgzq          Decimal? @db.Decimal(20, 2) // 一年内到期的可转换公司债券
+  rzrgdzc               Decimal? @db.Decimal(20, 2) // 融资租入固定资产
+  xjdqmye               Decimal? @db.Decimal(20, 2) // 现金的期末余额
+  xjdqcye               Decimal? @db.Decimal(20, 2) // 现金的期初余额
+  xjdhwdqmye            Decimal? @db.Decimal(20, 2) // 现金等价物的期末余额
+  xjdhwdqcye            Decimal? @db.Decimal(20, 2) // 现金等价物的期初余额
+  xjxjdhwdjzje          Decimal? @db.Decimal(20, 2) // 现金及现金等价物的净增加额
+
+  createdAt DateTime @default(now())
+
+  @@unique([dm, jzrq, plrq])
+  @@index([dm])
+  @@map("cashflow_statement")
+}
+
+// 资产负债表
+model BalanceSheet {
+  dm        String   @db.VarChar(20) // 股票代码
+  jzrq      String   @db.VarChar(20) // 截止日期
+  plrq      String   @db.VarChar(20) // 披露日期
+
+  nbysk             Decimal? @db.Decimal(20, 2) // 内部应收款
+  gdzcql            Decimal? @db.Decimal(20, 2) // 固定资产清理
+  yffbzk            Decimal? @db.Decimal(20, 2) // 应付分保账款
+  jsbfj             Decimal? @db.Decimal(20, 2) // 结算备付金
+  ysbf              Decimal? @db.Decimal(20, 2) // 应收保费
+  ysfbzk            Decimal? @db.Decimal(20, 2) // 应收分保账款
+  ysfbhtzbj         Decimal? @db.Decimal(20, 2) // 应收分保合同准备金
+  ysgl              Decimal? @db.Decimal(20, 2) // 应收股利
+  ysckts            Decimal? @db.Decimal(20, 2) // 应收出口退税
+  ysbtk             Decimal? @db.Decimal(20, 2) // 应收补贴款
+  ysbzj             Decimal? @db.Decimal(20, 2) // 应收保证金
+  dfy               Decimal? @db.Decimal(20, 2) // 待摊费用
+  dclldzcsy         Decimal? @db.Decimal(20, 2) // 待处理流动资产损益
+  ynndqdfldzc       Decimal? @db.Decimal(20, 2) // 一年内到期的非流动资产
+  cqysk             Decimal? @db.Decimal(20, 2) // 长期应收款
+  qtcqtz            Decimal? @db.Decimal(20, 2) // 其他长期投资
+  gdzcyz            Decimal? @db.Decimal(20, 2) // 固定资产原值
+  gdzcjz            Decimal? @db.Decimal(20, 2) // 固定资产净值
+  gdzcjzzbj         Decimal? @db.Decimal(20, 2) // 固定资产减值准备
+  scxswzc           Decimal? @db.Decimal(20, 2) // 生产性生物资产
+  gyxswzc           Decimal? @db.Decimal(20, 2) // 公益性生物资产
+  yqzc              Decimal? @db.Decimal(20, 2) // 油气资产
+  kfzc              Decimal? @db.Decimal(20, 2) // 开发支出
+  gqfzltq           Decimal? @db.Decimal(20, 2) // 股权分置流通权
+  qtfldzc           Decimal? @db.Decimal(20, 2) // 其他非流动资产
+  yfsxfyj           Decimal? @db.Decimal(20, 2) // 应付手续费及佣金
+  qtjyk             Decimal? @db.Decimal(20, 2) // 其他应交款
+  yfbzj             Decimal? @db.Decimal(20, 2) // 应付保证金
+  nbyfk             Decimal? @db.Decimal(20, 2) // 内部应付款
+  ytfy              Decimal? @db.Decimal(20, 2) // 预提费用
+  bxhtzbj           Decimal? @db.Decimal(20, 2) // 保险合同准备金
+  dlmmzqk           Decimal? @db.Decimal(20, 2) // 代理买卖证券款
+  dlcxzqk           Decimal? @db.Decimal(20, 2) // 代理承销证券款
+  gjpjjs            Decimal? @db.Decimal(20, 2) // 国际票证结算
+  gnpjjs            Decimal? @db.Decimal(20, 2) // 国内票证结算
+  dysr              Decimal? @db.Decimal(20, 2) // 递延收益
+  yfdqzq            Decimal? @db.Decimal(20, 2) // 应付短期债券
+  cqdysr            Decimal? @db.Decimal(20, 2) // 长期递延收益
+  wqddtzss          Decimal? @db.Decimal(20, 2) // 未确定的投资损失
+  nfpxjgl           Decimal? @db.Decimal(20, 2) // 拟分配现金股利
+  yjfz              Decimal? @db.Decimal(20, 2) // 预计负债
+  xsckjtycf         Decimal? @db.Decimal(20, 2) // 吸收存款及同业存放
+  yjldfz            Decimal? @db.Decimal(20, 2) // 预计流动负债
+  j_kcg             Decimal? @db.Decimal(20, 2) // 减：库存股
+  hbzj              Decimal? @db.Decimal(20, 2) // 货币资金
+  cczj              Decimal? @db.Decimal(20, 2) // 拆出资金
+  jyxjrzc           Decimal? @db.Decimal(20, 2) // 交易性金融资产
+  ysjrzc            Decimal? @db.Decimal(20, 2) // 衍生金融资产
+  yspj              Decimal? @db.Decimal(20, 2) // 应收票据
+  yszk              Decimal? @db.Decimal(20, 2) // 应收账款
+  yfkx              Decimal? @db.Decimal(20, 2) // 预付款项
+  yslx              Decimal? @db.Decimal(20, 2) // 应收利息
+  qtysk             Decimal? @db.Decimal(20, 2) // 其他应收款
+  mrfsjrzck         Decimal? @db.Decimal(20, 2) // 买入返售金融资产款
+  gyjzjzbdqjsrdq    Decimal? @db.Decimal(20, 2) // 以公允价值计量且其变动计入当期损益的金融资产
+  ch                Decimal? @db.Decimal(20, 2) // 存货
+  qtldzc            Decimal? @db.Decimal(20, 2) // 其他流动资产
+  ldzchj            Decimal? @db.Decimal(20, 2) // 流动资产合计
+  ffdkjjd           Decimal? @db.Decimal(20, 2) // 发放贷款及垫款
+  kkgsjrzc          Decimal? @db.Decimal(20, 2) // 可供出售金融资产
+  cyzdqtz           Decimal? @db.Decimal(20, 2) // 持有至到期投资
+  cqgqtz            Decimal? @db.Decimal(20, 2) // 长期股权投资
+  tzxfd             Decimal? @db.Decimal(20, 2) // 投资性房地产
+  ljzj              Decimal? @db.Decimal(20, 2) // 累计折旧
+  gdzc              Decimal? @db.Decimal(20, 2) // 固定资产
+  zjgc              Decimal? @db.Decimal(20, 2) // 在建工程
+  gcwz              Decimal? @db.Decimal(20, 2) // 工程物资
+  wxzc              Decimal? @db.Decimal(20, 2) // 无形资产
+  sy                Decimal? @db.Decimal(20, 2) // 商誉
+  cqdtfy            Decimal? @db.Decimal(20, 2) // 长期待摊费用
+  dysdszc           Decimal? @db.Decimal(20, 2) // 递延所得税资产
+  fldzchj           Decimal? @db.Decimal(20, 2) // 非流动资产合计
+  zczj              Decimal? @db.Decimal(20, 2) // 资产总计
+  dqjk              Decimal? @db.Decimal(20, 2) // 短期借款
+  xzyhyhk           Decimal? @db.Decimal(20, 2) // 向中央银行借款
+  crzj              Decimal? @db.Decimal(20, 2) // 拆入资金
+  jyxjrfz           Decimal? @db.Decimal(20, 2) // 交易性金融负债
+  ysjrfz            Decimal? @db.Decimal(20, 2) // 衍生金融负债
+  yfpj              Decimal? @db.Decimal(20, 2) // 应付票据
+  yfzk              Decimal? @db.Decimal(20, 2) // 应付账款
+  ysk               Decimal? @db.Decimal(20, 2) // 预收账款
+  mchgjrzck         Decimal? @db.Decimal(20, 2) // 卖出回购金融资产款
+  yfgzxc            Decimal? @db.Decimal(20, 2) // 应付职工薪酬
+  yjsf              Decimal? @db.Decimal(20, 2) // 应交税费
+  yflx              Decimal? @db.Decimal(20, 2) // 应付利息
+  yfgl              Decimal? @db.Decimal(20, 2) // 应付股利
+  qtfzk             Decimal? @db.Decimal(20, 2) // 其他应付款
+  ynndqdfldfz       Decimal? @db.Decimal(20, 2) // 一年内到期的非流动负债
+  qtldfz            Decimal? @db.Decimal(20, 2) // 其他流动负债
+  ldfzhj            Decimal? @db.Decimal(20, 2) // 流动负债合计
+  cqjk              Decimal? @db.Decimal(20, 2) // 长期借款
+  yfzq              Decimal? @db.Decimal(20, 2) // 应付债券
+  cqyfk             Decimal? @db.Decimal(20, 2) // 长期应付款
+  zxyfk             Decimal? @db.Decimal(20, 2) // 专项应付款
+  dysdsfz           Decimal? @db.Decimal(20, 2) // 递延所得税负债
+  qtfldfz           Decimal? @db.Decimal(20, 2) // 其他非流动负债
+  fldfzhj           Decimal? @db.Decimal(20, 2) // 非流动负债合计
+  fzhj              Decimal? @db.Decimal(20, 2) // 负债合计
+  sszb              Decimal? @db.Decimal(20, 2) // 实收资本 (或股本)
+  zbgj              Decimal? @db.Decimal(20, 2) // 资本公积
+  zxzb              Decimal? @db.Decimal(20, 2) // 专项储备
+  ylgj              Decimal? @db.Decimal(20, 2) // 盈余公积
+  ybfxzb            Decimal? @db.Decimal(20, 2) // 一般风险准备
+  wfplr             Decimal? @db.Decimal(20, 2) // 未分配利润
+  wbbzbzhc          Decimal? @db.Decimal(20, 2) // 外币报表折算差额
+  gsmgdqsyhj        Decimal? @db.Decimal(20, 2) // 归属于母公司股东权益合计
+  ssgdqy            Decimal? @db.Decimal(20, 2) // 少数股东权益
+  syzqyhj           Decimal? @db.Decimal(20, 2) // 所有者权益合计
+  fzhgdqyzj         Decimal? @db.Decimal(20, 2) // 负债和股东权益总计
+
+  createdAt DateTime @default(now())
+
+  @@unique([dm, jzrq, plrq])
+  @@index([dm])
+  @@map("balance_sheet")
+}
+
+// 历届监事会成员
+model SupervisoryBoardMember {
+  dm        String   @db.VarChar(20) // 股票代码
+  name      String?  @db.VarChar(100) // 姓名
+  title     String?  @db.VarChar(200) // 职务
+  sdate     String   @db.VarChar(20) // 起始日期
+  edate     String   @db.VarChar(20) // 终止日期
+  createdAt DateTime @default(now())
+
+  @@unique([dm, sdate, edate])
+  @@index([dm])
+  @@map("supervisory_board_member")
+}
+
+// 历届高管成员
+model ExecutiveMember {
+  id        BigInt   @id @default(autoincrement())
+  dm        String   @db.VarChar(20) // 股票代码
+  name      String?  @db.VarChar(100) // 姓名
+  title     String?  @db.VarChar(200) // 职务
+  sdate     String   @db.VarChar(20) // 起始日期
+  edate     String   @db.VarChar(20) // 终止日期
+  createdAt DateTime @default(now())
+
+  @@unique([dm, name, sdate, edate])
+  @@index([dm])
+  @@map("executive_member")
+}
+
+// 历届董事会成员
+model BoardMember {
+  dm        String   @db.VarChar(20) // 股票代码
+  name      String?  @db.VarChar(100) // 姓名
+  title     String?  @db.VarChar(200) // 职务
+  sdate     String   @db.VarChar(20) // 起始日期
+  edate     String   @db.VarChar(20) // 终止日期
+  createdAt DateTime @default(now())
+
+  @@unique([dm, sdate, edate])
+  @@index([dm])
+  @@map("board_member")
+}
+
+// 十大股东
+model ShareholderTop10 {
+  dm           String   @db.VarChar(20) // 股票代码
+  jzrq         String   @db.VarChar(20) // 截止日期
+  ggrq         String   @db.VarChar(20) // 公告日期
+  gdsm         String?  @db.Text // 股东说明
+  gdzs         Decimal? @db.Decimal(20, 2) // 股东总数
+  pjcg         Decimal? @db.Decimal(20, 2) // 平均持股
+  sdgdJson     String?  @db.Text // 十大股东明细 (JSON)
+  createdAt    DateTime @default(now())
+
+  @@unique([dm, jzrq, ggrq])
+  @@index([dm])
+  @@map("shareholder_top10")
+}
+
+// 十大流通股东
+model ShareholderTop10Float {
+  dm           String   @db.VarChar(20) // 股票代码
+  jzrq         String   @db.VarChar(20) // 截止日期
+  ggrq         String   @db.VarChar(20) // 公告日期
+  sdgdJson     String?  @db.Text // 十大流通股东明细 (JSON)
+  createdAt    DateTime @default(now())
+
+  @@unique([dm, jzrq, ggrq])
+  @@index([dm])
+  @@map("shareholder_top10_float")
+}
+
+// 股东变化趋势
+model ShareholderChangeTrend {
+  dm        String   @db.VarChar(20) // 股票代码
+  jzrq      String   @db.VarChar(20) // 截止日期
+  gdhs      String?  @db.VarChar(100) // 股东户数
+  bh        String?  @db.VarChar(200) // 比上期变化情况
+  createdAt DateTime @default(now())
+
+  @@unique([dm, jzrq])
+  @@index([dm])
+  @@map("shareholder_change_trend")
+}
+
+// 基金持股
+model FundHolding {
+  dm        String   @db.VarChar(20) // 股票代码
+  jzrq      String   @db.VarChar(20) // 截止日期
+  jjdm      String   @db.VarChar(50) // 基金代码
+  jjmc      String?  @db.VarChar(500) // 基金名称
+  ccsl      Decimal? @db.Decimal(20, 2) // 持仓数量
+  ltbl      Decimal? @db.Decimal(10, 4) // 占流通股比例
+  cgsz      Decimal? @db.Decimal(20, 2) // 持股市值
+  jzbl      Decimal? @db.Decimal(10, 4) // 占净值比例
+  createdAt DateTime @default(now())
+
+  @@unique([dm, jzrq, jjdm])
+  @@index([dm])
+  @@map("fund_holdings")
+}
+
+// 近期分红
+model RecentDividend {
+  dm        String   @db.VarChar(20) // 股票代码
+  jzrq      String   @db.VarChar(20) // 截止日期
+  plrq      String   @db.VarChar(20) // 披露日期
+  fhx       String?  @db.VarChar(50) // 分红方案
+  fhjyr     String?  @db.VarChar(20) // 分红基准日
+  fhjzr     String?  @db.VarChar(20) // 分红除权日
+  hf        String?  @db.VarChar(50) // 红股方案
+  hfjyr     String?  @db.VarChar(20) // 红股基准日
+  hfjzr     String?  @db.VarChar(20) // 红股除权日
+  zf        String?  @db.VarChar(50) // 转增方案
+  zfjyr     String?  @db.VarChar(20) // 转增基准日
+  zfjzr     String?  @db.VarChar(20) // 转增除权日
+  createdAt DateTime @default(now())
+
+  @@unique([dm, jzrq, plrq])
+  @@index([dm])
+  @@map("recent_dividend")
+}
+
+// 近期增发
+model RecentAdditionalIssue {
+  dm        String   @db.VarChar(20) // 股票代码
+  jzrq      String   @db.VarChar(20) // 截止日期
+  plrq      String   @db.VarChar(20) // 披露日期
+  zfx       String?  @db.VarChar(100) // 增发方案
+  zfrq      String?  @db.VarChar(20) // 增发日期
+  zfxz      String?  @db.VarChar(100) // 增发对象
+  zxj       Decimal? @db.Decimal(10, 2) // 最新价
+  zxr       Decimal? @db.Decimal(10, 2) // 增发价
+  zxsl      Decimal? @db.Decimal(20, 2) // 增发数量
+  zje       Decimal? @db.Decimal(20, 2) // 总金额
+  createdAt DateTime @default(now())
+
+  @@unique([dm, jzrq, plrq])
+  @@index([dm])
+  @@map("recent_additional_issue")
+}
+
+// 季度利润
+model QuarterlyProfit {
+  dm        String   @db.VarChar(20) // 股票代码
+  jzrq      String   @db.VarChar(20) // 截止日期
+  plrq      String   @db.VarChar(20) // 披露日期
+  jlr       Decimal? @db.Decimal(20, 2) // 净利润
+  jlrzz     Decimal? @db.Decimal(10, 2) // 净利润增长率
+  yysr      Decimal? @db.Decimal(20, 2) // 营业收入
+  yysrzz    Decimal? @db.Decimal(10, 2) // 营业收入增长率
+  jlrhfe    Decimal? @db.Decimal(20, 2) // 净利润环比
+  yysrhfe   Decimal? @db.Decimal(20, 2) // 营业收入环比
+  createdAt DateTime @default(now())
+
+  @@unique([dm, jzrq, plrq])
+  @@index([dm])
+  @@map("quarterly_profit")
+}
+
+// 季度现金流
+model QuarterlyCashFlow {
+  dm        String   @db.VarChar(20) // 股票代码
+  jzrq      String   @db.VarChar(20) // 截止日期
+  plrq      String   @db.VarChar(20) // 披露日期
+  jydxjlr   Decimal? @db.Decimal(20, 2) // 经营现金流
+  tzdxjlr   Decimal? @db.Decimal(20, 2) // 投资现金流
+  czdxjlr   Decimal? @db.Decimal(20, 2) // 筹资现金流
+  xjjze     Decimal? @db.Decimal(20, 2) // 现金净增加额
+  createdAt DateTime @default(now())
+
+  @@unique([dm, jzrq, plrq])
+  @@index([dm])
+  @@map("quarterly_cash_flow")
+}
+
+// 资金流向
+model MoneyFlow {
+  dm        String   @db.VarChar(20) // 股票代码
+  t         String   @db.VarChar(20) // 时间
+  ljlr      Decimal? @db.Decimal(20, 2) // 累计流入
+  ljlc      Decimal? @db.Decimal(20, 2) // 累计流出
+  ddanl     Decimal? @db.Decimal(20, 2) // 大单安量
+  ddbb      Decimal? @db.Decimal(10, 4) // 大单占比
+  createdAt DateTime @default(now())
+
+  @@unique([dm, t])
+  @@index([dm])
+  @@map("money_flow")
+}
+
+// 今日分时成交
+model TodayTickTrade {
+  dm        String   @db.VarChar(20) // 股票代码
+  t         String   @db.VarChar(20) // 时间
+  p         Decimal? @db.Decimal(10, 2) // 价格
+  v         Decimal? @db.Decimal(20, 2) // 成交量
+  bv        Decimal? @db.Decimal(20, 2) // 买量
+  sv        Decimal? @db.Decimal(20, 2) // 卖量
+  bs        String?  @db.VarChar(10) // 买卖标志
+  createdAt DateTime @default(now())
+
+  @@unique([dm, t])
+  @@index([dm])
+  @@map("today_tick_trade")
+}
+
+// 历史停牌
+model StopPriceHistory {
+  dm        String   @db.VarChar(20) // 股票代码
+  t         String   @db.VarChar(20) // 时间
+  tp        String?  @db.VarChar(50) // 停牌类型
+  sdrq      String?  @db.VarChar(20) // 开始日期
+  edrq      String?  @db.VarChar(20) // 结束日期
+  tpjc      String?  @db.VarChar(200) // 停牌简称
+  lxrq      String?  @db.VarChar(20) // 连续日期
+  sdr       String?  @db.VarChar(20) // 开始日
+  ed        String?  @db.VarChar(20) // 结束日
+  createdAt DateTime @default(now())
+
+  @@unique([dm, t])
+  @@index([dm])
+  @@map("stop_price_history")
+}
+
+// 沪深个股实时五档
+model HsStockRealFive {
+  dm        String   @db.VarChar(20) // 股票代码
+  t         String   @db.VarChar(20) // 时间
+  p         Decimal? @db.Decimal(10, 2) // 当前价
+  bj1p      Decimal? @db.Decimal(10, 2) // 买一价
+  bj1v      Decimal? @db.Decimal(20, 2) // 买一量
+  bj2p      Decimal? @db.Decimal(10, 2) // 买二价
+  bj2v      Decimal? @db.Decimal(20, 2) // 买二量
+  bj3p      Decimal? @db.Decimal(10, 2) // 买三价
+  bj3v      Decimal? @db.Decimal(20, 2) // 买三量
+  bj4p      Decimal? @db.Decimal(10, 2) // 买四价
+  bj4v      Decimal? @db.Decimal(20, 2) // 买四量
+  bj5p      Decimal? @db.Decimal(10, 2) // 买五价
+  bj5v      Decimal? @db.Decimal(20, 2) // 买五量
+  sj1p      Decimal? @db.Decimal(10, 2) // 卖一价
+  sj1v      Decimal? @db.Decimal(20, 2) // 卖一量
+  sj2p      Decimal? @db.Decimal(10, 2) // 卖二价
+  sj2v      Decimal? @db.Decimal(20, 2) // 卖二量
+  sj3p      Decimal? @db.Decimal(10, 2) // 卖三价
+  sj3v      Decimal? @db.Decimal(20, 2) // 卖三量
+  sj4p      Decimal? @db.Decimal(10, 2) // 卖四价
+  sj4v      Decimal? @db.Decimal(20, 2) // 卖四量
+  sj5p      Decimal? @db.Decimal(10, 2) // 卖五价
+  sj5v      Decimal? @db.Decimal(20, 2) // 卖五量
+  createdAt DateTime @default(now())
+
+  @@unique([dm, t])
+  @@index([dm])
+  @@map("hs_stock_real_five")
+}
+
+// 科创个股实时五档
+model KcStockRealFive {
+  dm        String   @db.VarChar(20) // 股票代码
+  t         String   @db.VarChar(20) // 时间
+  p         Decimal? @db.Decimal(10, 2) // 当前价
+  bj1p      Decimal? @db.Decimal(10, 2) // 买一价
+  bj1v      Decimal? @db.Decimal(20, 2) // 买一量
+  bj2p      Decimal? @db.Decimal(10, 2) // 买二价
+  bj2v      Decimal? @db.Decimal(20, 2) // 买二量
+  bj3p      Decimal? @db.Decimal(10, 2) // 买三价
+  bj3v      Decimal? @db.Decimal(20, 2) // 买三量
+  bj4p      Decimal? @db.Decimal(10, 2) // 买四价
+  bj4v      Decimal? @db.Decimal(20, 2) // 买四量
+  bj5p      Decimal? @db.Decimal(10, 2) // 买五价
+  bj5v      Decimal? @db.Decimal(20, 2) // 买五量
+  sj1p      Decimal? @db.Decimal(10, 2) // 卖一价
+  sj1v      Decimal? @db.Decimal(20, 2) // 卖一量
+  sj2p      Decimal? @db.Decimal(10, 2) // 卖二价
+  sj2v      Decimal? @db.Decimal(20, 2) // 卖二量
+  sj3p      Decimal? @db.Decimal(10, 2) // 卖三价
+  sj3v      Decimal? @db.Decimal(20, 2) // 卖三量
+  sj4p      Decimal? @db.Decimal(10, 2) // 卖四价
+  sj4v      Decimal? @db.Decimal(20, 2) // 卖四量
+  sj5p      Decimal? @db.Decimal(10, 2) // 卖五价
+  sj5v      Decimal? @db.Decimal(20, 2) // 卖五量
+  createdAt DateTime @default(now())
+
+  @@unique([dm, t])
+  @@index([dm])
+  @@map("kc_stock_real_five")
+}
+
+// 北交所个股实时五档
+model BjStockRealFive {
+  dm        String   @db.VarChar(20) // 股票代码
+  t         String   @db.VarChar(20) // 时间
+  p         Decimal? @db.Decimal(10, 2) // 当前价
+  bj1p      Decimal? @db.Decimal(10, 2) // 买一价
+  bj1v      Decimal? @db.Decimal(20, 2) // 买一量
+  bj2p      Decimal? @db.Decimal(10, 2) // 买二价
+  bj2v      Decimal? @db.Decimal(20, 2) // 买二量
+  bj3p      Decimal? @db.Decimal(10, 2) // 买三价
+  bj3v      Decimal? @db.Decimal(20, 2) // 买三量
+  bj4p      Decimal? @db.Decimal(10, 2) // 买四价
+  bj4v      Decimal? @db.Decimal(20, 2) // 买四量
+  bj5p      Decimal? @db.Decimal(10, 2) // 买五价
+  bj5v      Decimal? @db.Decimal(20, 2) // 买五量
+  sj1p      Decimal? @db.Decimal(10, 2) // 卖一价
+  sj1v      Decimal? @db.Decimal(20, 2) // 卖一量
+  sj2p      Decimal? @db.Decimal(10, 2) // 卖二价
+  sj2v      Decimal? @db.Decimal(20, 2) // 卖二量
+  sj3p      Decimal? @db.Decimal(10, 2) // 卖三价
+  sj3v      Decimal? @db.Decimal(20, 2) // 卖三量
+  sj4p      Decimal? @db.Decimal(10, 2) // 卖四价
+  sj4v      Decimal? @db.Decimal(20, 2) // 卖四量
+  sj5p      Decimal? @db.Decimal(10, 2) // 卖五价
+  sj5v      Decimal? @db.Decimal(20, 2) // 卖五量
+  createdAt DateTime @default(now())
+
+  @@unique([dm, t])
+  @@index([dm])
+  @@map("bj_stock_real_five")
+}
+
+// 港股个股实时五档
+model HkStockRealFive {
+  dm        String   @db.VarChar(20) // 股票代码
+  t         String   @db.VarChar(20) // 时间
+  p         Decimal? @db.Decimal(10, 2) // 当前价
+  bj1p      Decimal? @db.Decimal(10, 2) // 买一价
+  bj1v      Decimal? @db.Decimal(20, 2) // 买一量
+  bj2p      Decimal? @db.Decimal(10, 2) // 买二价
+  bj2v      Decimal? @db.Decimal(20, 2) // 买二量
+  bj3p      Decimal? @db.Decimal(10, 2) // 买三价
+  bj3v      Decimal? @db.Decimal(20, 2) // 买三量
+  bj4p      Decimal? @db.Decimal(10, 2) // 买四价
+  bj4v      Decimal? @db.Decimal(20, 2) // 买四量
+  bj5p      Decimal? @db.Decimal(10, 2) // 买五价
+  bj5v      Decimal? @db.Decimal(20, 2) // 买五量
+  sj1p      Decimal? @db.Decimal(10, 2) // 卖一价
+  sj1v      Decimal? @db.Decimal(20, 2) // 卖一量
+  sj2p      Decimal? @db.Decimal(10, 2) // 卖二价
+  sj2v      Decimal? @db.Decimal(20, 2) // 卖二量
+  sj3p      Decimal? @db.Decimal(10, 2) // 卖三价
+  sj3v      Decimal? @db.Decimal(20, 2) // 卖三量
+  sj4p      Decimal? @db.Decimal(10, 2) // 卖四价
+  sj4v      Decimal? @db.Decimal(20, 2) // 卖四量
+  sj5p      Decimal? @db.Decimal(10, 2) // 卖五价
+  sj5v      Decimal? @db.Decimal(20, 2) // 卖五量
+  createdAt DateTime @default(now())
+
+  @@unique([dm, t])
+  @@index([dm])
+  @@map("hk_stock_real_five")
+}
+
+// 指数实时行情
+model IndexRealTimeData {
+  dm        String   @db.VarChar(20) // 指数代码
+  t         String   @db.VarChar(20) // 时间
+  p         Decimal? @db.Decimal(10, 2) // 当前价
+  o         Decimal? @db.Decimal(10, 2) // 开盘价
+  h         Decimal? @db.Decimal(10, 2) // 最高价
+  l         Decimal? @db.Decimal(10, 2) // 最低价
+  pc        Decimal? @db.Decimal(10, 2) // 昨收价
+  v         Decimal? @db.Decimal(20, 2) // 成交量
+  a         Decimal? @db.Decimal(20, 2) // 成交额
+  createdAt DateTime @default(now())
+
+  @@unique([dm, t])
+  @@index([dm])
+  @@map("index_real_time_data")
+}
+
+// 历史 MA 指标
+model HistoryMa {
+  dm        String   @db.VarChar(20) // 股票代码
+  t         String   @db.VarChar(20) // 时间
+  ma5       Decimal? @db.Decimal(10, 4) // MA5
+  ma10      Decimal? @db.Decimal(10, 4) // MA10
+  ma20      Decimal? @db.Decimal(10, 4) // MA20
+  ma30      Decimal? @db.Decimal(10, 4) // MA30
+  ma60      Decimal? @db.Decimal(10, 4) // MA60
+  createdAt DateTime @default(now())
+
+  @@unique([dm, t])
+  @@index([dm])
+  @@map("history_ma")
+}
+
+// 历史 MACD 指标
+model HistoryMacd {
+  dm        String   @db.VarChar(20) // 股票代码
+  t         String   @db.VarChar(20) // 时间
+  dif       Decimal? @db.Decimal(10, 4) // DIF
+  dea       Decimal? @db.Decimal(10, 4) // DEA
+  macd      Decimal? @db.Decimal(10, 4) // MACD
+  createdAt DateTime @default(now())
+
+  @@unique([dm, t])
+  @@index([dm])
+  @@map("history_macd")
+}
+
+// 历史 BOLL 指标
+model HistoryBoll {
+  dm        String   @db.VarChar(20) // 股票代码
+  t         String   @db.VarChar(20) // 时间
+  up        Decimal? @db.Decimal(10, 4) // UP 轨
+  mid       Decimal? @db.Decimal(10, 4) // 中轨
+  dn        Decimal? @db.Decimal(10, 4) // 下轨
+  createdAt DateTime @default(now())
+
+  @@unique([dm, t])
+  @@index([dm])
+  @@map("history_boll")
+}
+
+// 历史 KDJ 指标
+model HistoryKdj {
+  dm        String   @db.VarChar(20) // 股票代码
+  t         String   @db.VarChar(20) // 时间
+  k         Decimal? @db.Decimal(10, 4) // K 值
+  d         Decimal? @db.Decimal(10, 4) // D 值
+  j         Decimal? @db.Decimal(10, 4) // J 值
+  createdAt DateTime @default(now())
+
+  @@unique([dm, t])
+  @@index([dm])
+  @@map("history_kdj")
+}
+
+// 市场指标
+model MarketIndicator {
+  dm        String   @db.VarChar(20) // 股票代码
+  t         String   @db.VarChar(20) // 时间
+  zsl       Decimal? @db.Decimal(20, 2) // 总量
+  zl        Decimal? @db.Decimal(20, 2) // 总量 (万)
+  createdAt DateTime @default(now())
+
+  @@unique([dm, t])
+  @@index([dm])
+  @@map("market_indicator")
+}
+
+// 指数关系树
+model ZgTree {
+  dm        String   @db.VarChar(20) // 指数代码
+  mc        String?  @db.VarChar(200) // 指数名称
+  parentId  String?  @db.VarChar(20) // 父指数代码
+  level     Int?     // 层级
+  createdAt DateTime @default(now())
+
+  @@unique([dm])
+  @@index([dm])
+  @@map("zg_tree")
+}
+
+// 指数相关股票
+model RelatedCode {
+  dm        String   @db.VarChar(20) // 股票代码
+  zsdm      String   @db.VarChar(20) // 所属指数代码
+  zsmc      String?  @db.VarChar(200) // 所属指数名称
+  createdAt DateTime @default(now())
+
+  @@unique([dm, zsdm])
+  @@index([dm])
+  @@map("related_code")
+}
+
+// 股票相关指数
+model RelatedStock {
+  zsdm      String   @db.VarChar(20) // 指数代码
+  zsmc      String?  @db.VarChar(200) // 指数名称
+  dm        String   @db.VarChar(20) // 股票代码
+  mc        String?  @db.VarChar(200) // 股票名称
+  createdAt DateTime @default(now())
+
+  @@unique([zsdm, dm])
+  @@index([zsdm])
+  @@map("related_stock")
+}
+
+// 所属指数
+model BelongingIndex {
+  dm        String   @db.VarChar(20) // 股票代码
+  zsdm      String   @db.VarChar(20) // 指数代码
+  zsmc      String?  @db.VarChar(200) // 指数名称
+  createdAt DateTime @default(now())
+
+  @@unique([dm, zsdm])
+  @@index([dm])
+  @@map("belonging_index")
+}
+
+// 实时交易数据 - 券商
+model RealtimeTradingBroker {
+  dm        String   @db.VarChar(20) // 股票代码
+  t         String   @db.VarChar(20) // 时间
+  p         Decimal? @db.Decimal(10, 2) // 价格
+  v         Decimal? @db.Decimal(20, 2) // 成交量
+  bs        String?  @db.VarChar(10) // 买卖标志
+  createdAt DateTime @default(now())
+
+  @@unique([dm, t])
+  @@index([dm])
+  @@map("realtime_trading_broker")
+}
+
+// 实时交易数据 - 网络
+model RealtimeTradingNetwork {
+  dm        String   @db.VarChar(20) // 股票代码
+  t         String   @db.VarChar(20) // 时间
+  p         Decimal? @db.Decimal(10, 2) // 价格
+  v         Decimal? @db.Decimal(20, 2) // 成交量
+  bs        String?  @db.VarChar(10) // 买卖标志
+  createdAt DateTime @default(now())
+
+  @@unique([dm, t])
+  @@index([dm])
+  @@map("realtime_trading_network")
+}
+
+// ETF 基金列表
+model EtfFundList {
+  dm        String   @db.VarChar(30) // 基金代码
+  mc        String?  @db.VarChar(200) // 基金名称
+  jys       String?  @db.VarChar(50) // 交易所
+  updatedAt DateTime? @db.Date // 更新时间
+  createdAt DateTime @default(now())
+
+  @@unique([dm])
+  @@index([dm])
+  @@map("etf_fund_list")
+}
+
+// 北证指数列表
+model BjIndexList {
+  dm        String   @db.VarChar(30) // 指数代码
+  mc        String?  @db.VarChar(200) // 指数名称
+  jys       String?  @db.VarChar(50) // 交易所
+  updatedAt DateTime? @db.Date // 更新时间
+  createdAt DateTime @default(now())
+
+  @@unique([dm])
+  @@index([dm])
+  @@map("bj_index_list")
+}
+
+// 北证股票列表
+model BjStockList {
+  dm        String   @db.VarChar(30) // 股票代码
+  mc        String?  @db.VarChar(200) // 股票名称
+  jys       String?  @db.VarChar(50) // 交易所
+  updatedAt DateTime? @db.Date // 更新时间
+  createdAt DateTime @default(now())
+
+  @@unique([dm])
+  @@index([dm])
+  @@map("bj_stock_list")
+}
+
+// 科创股票列表
+model KcStockList {
+  dm        String   @db.VarChar(30) // 股票代码
+  mc        String?  @db.VarChar(200) // 股票名称
+  jys       String?  @db.VarChar(50) // 交易所
+  updatedAt DateTime? @db.Date // 更新时间
+  createdAt DateTime @default(now())
+
+  @@unique([dm])
+  @@index([dm])
+  @@map("kc_stock_list")
+}
+
+// 股票基础信息
+model StockBasicInfo {
+  dm        String   @db.VarChar(20) // 股票代码
+  mc        String?  @db.VarChar(200) // 股票名称
+  ssrq      String?  @db.VarChar(20) // 上市日期
+  fxj       Decimal? @db.Decimal(10, 2) // 发行价
+  fxsl      Decimal? @db.Decimal(20, 2) // 发行数量
+  createdAt DateTime @default(now())
+
+  @@unique([dm])
+  @@index([dm])
+  @@map("stock_basic_info")
+}
