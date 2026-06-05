@@ -34,8 +34,8 @@ services:
   # NestJS Backend
   server:
     build:
-      context: ./apps/server
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/server/Dockerfile
     container_name: king-server
     ports:
       - "4000:4000"
@@ -58,8 +58,11 @@ services:
   # Next.js Frontend
   web:
     build:
-      context: ./apps/web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://server:4000
+        NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-掘金股}
     container_name: king-web
     ports:
       - "3000:3000"

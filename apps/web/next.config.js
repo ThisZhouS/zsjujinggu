@@ -1,7 +1,10 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
+  output: 'standalone',
   distDir: process.env.NODE_ENV === 'development' ? '.next-dev' : '.next',
 
   // API 代理到后端
@@ -29,6 +32,7 @@ const nextConfig = {
 
   // 实验性功能
   experimental: {
+    outputFileTracingRoot: path.join(__dirname, '../../'),
     serverActions: {
       bodySizeLimit: '2mb',
     },

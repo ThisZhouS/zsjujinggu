@@ -1,0 +1,107 @@
+services:
+  postgres:
+    image: postgres:15-bookworm
+    container_name: zsjujinggu-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-king}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-king}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-king} -d ${POSTGRES_DB:-king}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-bookworm
+    container_name: zsjujinggu-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    image: zsjujinggu/server:latest
+    container_name: zsjujinggu-server
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-king}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-king}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      MAIRUI_API_KEY: ${MAIRUI_API_KEY:?MAIRUI_API_KEY is required}
+      MAIRUI_API_BASE: ${MAIRUI_API_BASE:-http://api.mairuiapi.com}
+      MAIRUI_API_REALTIME_BASE: ${MAIRUI_API_REALTIME_BASE:-http://a.mairuiapi.com}
+      BUSINESS_DATA_MIN_REFRESH_COVERAGE: ${BUSINESS_DATA_MIN_REFRESH_COVERAGE:-0.8}
+      BUSINESS_DATA_MIN_TARGET_DATE_COVERAGE: ${BUSINESS_DATA_MIN_TARGET_DATE_COVERAGE:-0}
+      BUSINESS_DATA_BLOCK_EMPTY_EXECUTIVE_TRADES: ${BUSINESS_DATA_BLOCK_EMPTY_EXECUTIVE_TRADES:-false}
+      TRADINGKEY_MIN_LIST_COMPLETENESS: ${TRADINGKEY_MIN_LIST_COMPLETENESS:-0.95}
+      TRADINGKEY_BLOCK_EMPTY_DAILY_TRADES: ${TRADINGKEY_BLOCK_EMPTY_DAILY_TRADES:-false}
+      NEWS_AUTOMATION_KEY: ${NEWS_AUTOMATION_KEY:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      DEEPSEEK_API_BASE: ${DEEPSEEK_API_BASE:-https://api.deepseek.com/v1}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:4000/api/v1').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://server:4000}
+        NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-掘金股}
+    image: zsjujinggu/web:latest
+    container_name: zsjujinggu-web
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://server:4000}
+      NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-掘金股}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      server:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:
